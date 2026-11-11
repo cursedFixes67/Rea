@@ -64,6 +64,7 @@ jobs:
         env:
           DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
         run: |
+          flutter pub get --enforce-lockfile
           ./android/gradlew -p android app:connectedReleaseAndroidTest -PdreamReleaseTest=true -Ptarget="$PWD/integration_test/source_journey_test.dart" -Ptarget-platform=android-x64 --console=plain
       - name: Install and launch ARM64 artifact
         run: |

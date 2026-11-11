@@ -69,6 +69,9 @@ flutter {
 }
 
 dependencies {
+    if (project.hasProperty("dreamReleaseTest")) {
+        implementation(project(":integration_test"))
+    }
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test:rules:1.7.0")
     implementation(project(":extension-api"))
