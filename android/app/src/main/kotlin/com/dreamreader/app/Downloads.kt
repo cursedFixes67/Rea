@@ -90,13 +90,28 @@ class DownloadController(private val context: Context) {
         }
         return JSONObject().put("ok", true)
     }
-    fun list(): JSONArray = JSONArray(root.listFiles().orEmpty().filter { File(it, "job.json").exists() }.map { dir ->
-        val job = JSONObject(File(dir, "job.json").readText())
+    fun list(): JSONArray = JSONArray(root.listFiles().orEmpty()
+        .filter { it.isDirectory && Regex("[a-f0-9]{64}").matches(it.name) }
+        .sortedByDescending { File(it, "job.json").lastModified() }
+        .mapNotNull { dir ->
+        val metadata = File(dir, "job.json")
+        val job = try {
+            if (!metadata.isFile) return@mapNotNull null
+            JSONObject(metadata.readText()).also { it.getJSONArray("pages") }
+        } catch (_: java.io.FileNotFoundException) {
+            // A user can delete a chapter while a queue or backup snapshot is reading it.
+            return@mapNotNull null
+        } catch (_: org.json.JSONException) {
+            return@mapNotNull JSONObject().put("id", dir.name).put("title", "Damaged download")
+                .put("chapter", "Metadata could not be read").put("status", "CORRUPT")
+                .put("completed", 0).put("total", 0).put("bytes", dir.listFiles().orEmpty().sumOf { it.length() })
+                .put("error", "Delete this entry and download the chapter again. Your reading progress is unaffected.")
+        }
         val info = job.optString("workId").takeIf { it.isNotBlank() }?.let { workId ->
             runCatching { manager.getWorkInfoById(UUID.fromString(workId)).get() }.getOrNull()
         } ?: manager.getWorkInfosForUniqueWork("chapter-${dir.name}").get().let { rows -> rows.firstOrNull { !it.state.isFinished } ?: rows.lastOrNull() }
         val total = job.getJSONArray("pages").length()
-        val completed = (0 until total).count { File(dir, "$it.image").exists() }
+        val completed = (0 until total).count { File(dir, "$it.image").let { file -> file.isFile && file.length() > 0 } }
         JSONObject().put("id", dir.name).put("key", job.optString("key")).put("mangaKey", job.optString("mangaKey")).put("chapterUrl", job.optString("chapterUrl")).put("bytes", dir.listFiles().orEmpty().filter { it.name.endsWith(".image") }.sumOf { it.length() }).put("title", job.optString("title")).put("chapter", job.optString("chapterName"))
             .put("completed", completed).put("total", total).put("status", if (completed == total && total > 0) "SUCCEEDED" else info?.state?.name ?: "PAUSED")
             .put("error", info?.outputData?.getString("error") ?: "")
@@ -105,7 +120,7 @@ class DownloadController(private val context: Context) {
         val dir = File(root, id(key)); val metadata = File(dir, "job.json")
         if (!metadata.exists()) return JSONArray()
         val count = JSONObject(metadata.readText()).getJSONArray("pages").length()
-        if (!(0 until count).all { File(dir, "$it.image").isFile }) return JSONArray()
+        if (count == 0 || !(0 until count).all { File(dir, "$it.image").let { file -> file.isFile && file.length() > 0 } }) return JSONArray()
         return JSONArray((0 until count).map { JSONObject().put("url", File(dir, "$it.image").path).put("headers", JSONObject()) })
     }
 }

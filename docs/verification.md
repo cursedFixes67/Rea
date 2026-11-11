@@ -1,47 +1,42 @@
 <!-- coderabbit-ai-generated:v1 -->
 
-<!-- coderabbit-ai-generated-section:v1:5197f6d7939ad5e38f70d1c0cb70938184ba4ace4292a043e873b200bef46ba1 -->
-
-<!-- coderabbit-ai-generated-section:v1:ba091cc29e33fb12990c2562e58bd1a78eb1af16d3e4b73c0957adbe6ea14393 -->
+<!-- coderabbit-ai-generated-section:v1:0411c32443d8f56de211b218f5dd69bdfc2d6bf5ed9c01fbafdd4c803b96fcd4 -->
 
 # Verification status
 
-## Release verification
+## Version 2 development checkpoints
 
-Version 1.0.0, package `com.dreamreader.app`, minimum Android 8.0 (API 26), ARM64 only. The initial candidate was built from `bb02a6730566af625a40067c1a909d90218135cb`; subsequent builds added tracking and backup-settings validation. The owner requested publication and explicitly took responsibility for device testing. See the v1.0.0 release notes and assets for the final artifact checksum. Device verification remains outstanding.
+Version 2.0.0 uses package `com.dreamreader.app`, Android version code 2, minimum API 26 and ARM64 only. It retains version 1's production signing certificate:
 
-- Initial candidate APK: 25,056,340 bytes.
-- Initial candidate SHA-256: `7b9aee70eca51953b11a8f26fc8f93bc9b223bff8cf431251508516c132844c8`.
-- Signing certificate SHA-256: `881f2a3fa91f54dd556728334c9c598a31ddb2cdfe44e956a2618d255ebdfa4b`.
-- Independently passed ZIP CRC, ARM64 ELF identification, package ID, release/not-debuggable checks, APK v2 signature and 16 KB ZIP/ELF alignment checks.
-- Production DEX does not include Flutter's IntegrationTestPlugin.
+```text
+881f2a3fa91f54dd556728334c9c598a31ddb2cdfe44e956a2618d255ebdfa4b
+```
 
-## Completed development checks
+The signed checkpoint containing the native QuickJS adapter passed ZIP CRC, release/non-debuggable checks, package/ABI checks, Android signature verification and 16 KB ZIP/ELF alignment. Its APK SHA-256 was `36d892cb19f1494295336bfedb383576d3392e3441bddb96b896df895572f735`. This is a development checkpoint; final release assets identify the published binary.
 
-- Flutter analysis: no issues.
-- Thirteen unit/widget tests passed; a separate scale test also passed. These cover live-index fixtures, malformed protobuf, source metadata round trips, checksum verification, transactional backup merge, sticky read progress, Mihon imports and repository consent.
-- SQLite scale fixture: 3,000 titles and 30,000 chapters; correct aggregates and indexed chapter retrieval. Host library and aggregate queries took 80 ms. This is not a phone rendering benchmark.
-- Live official Keiyoushi catalogue fetched and parsed: 1,587 entries in the observed snapshot, signer pin checked.
-- Flutter web release and Android debug/release compilation succeeded.
-- Cloud browser navigation, catalogue refresh, Home customization persistence and appearance selection exercised.
+The release DEX checks passed 60 Injekt generic type tokens and 1,030 actual host class/member references from Atsumaru 1.6.26 and Kagane 1.6.42. Negative checks rejected version 1's stripped type metadata, an earlier V2 checkpoint's missing Zstandard APIs, and an actual test-enabled APK containing Flutter's integration-test channel.
 
-## Outstanding device acceptance
+## Host and browser coverage
 
-The local sandbox has no hardware virtualization. Android 15 and Android 11 software emulators failed during system startup/package installation. Android 11 briefly reported completed boot, but its package manager subsequently became unavailable. No app test passed on those devices.
+- Flutter analysis passed. The 48-case full suite passed before the latest search/cover-transition refinements; fresh coverage is recorded with the final release.
+- Six Python artifact-parser tests passed, including real DEX fixtures and inheritance/overload boundaries.
+- Eighteen Android JVM tests passed: payload-file boundaries, adjustable download concurrency, image-region geometry, extension lifecycle locking and atomic source registration.
+- Android acceptance test sources and APK compiled successfully after aligning Flutter's older transitive test dependencies. No instrumentation execution is claimed.
+- The pinned QuickJS JNI sources passed a Linux host harness for primitive values, errors, 24 concurrent independent evaluations and context reset. This is not an Android binary execution.
+- SQLite scale fixture: 3,000 titles and 30,000 chapters, correct indexed/paginated results. Observed host queries were approximately 14 ms for the first 201 update rows and 100 ms for library/aggregate retrieval; these are not phone frame-rate measurements.
+- The live official catalogue was parsed with 1,587 observed entries. Cloud Preview exercised catalogue refresh, Atsumaru/Kagane visibility with adult-only sources disabled, Home customization, Theme Studio and dark/light appearances.
 
-GitHub Actions now prepares an accelerated Android device and uses native instrumentation for the release-mode source journey. It must pass extension installation/signature rejection, loading, search, metadata, chapters, images, downloads, backup merge and navigation. ARM64 installation and launch follow that journey. Results are pending; compilation and static checks do not establish source compatibility.
+## Device acceptance remains with the owner
 
-Scheduled SAF backups, broad extension compatibility, very large image rendering, phone scrolling performance and background execution still require device evidence. Tracking sign-in requires registered public AniList/MyAnimeList client IDs; no tracker sign-in has been verified.
+The owner explicitly requested publication and assigned device testing to themselves. That changes the publication gate; it does not convert unperformed checks into passes. No installation, launch or extension-execution success is claimed on an Android device. CI device journeys are optional and off by default.
+
+Phone checks include installation over version 1, Atsumaru/Kagane installation and loading, source search/chapters/images, long-image decoding, reader controls, background downloads, SAF backup scheduling and restore. OEM background restrictions, source-site changes and Android codec support require runtime evidence. Static linkage covers the observed extension versions, not the whole ecosystem.
+
+Tracker sign-in requires registered public AniList/MyAnimeList client IDs and has not been verified with live accounts. No unnecessary telemetry is included.
 
 ## Import boundaries
 
-Mihon imports cover saved titles, source IDs, metadata, chapters, read state, page positions, bookmarks, categories and reading history. Multiple categories are represented as a combined category. Tracker sessions, credentials, extension APKs and source preferences are not imported. Existing Dream Reader records are preserved. Download inventory can be backed up; downloaded image files are not part of a backup.
-
-
-<!-- /coderabbit-ai-generated:v1 -->
-## Publication decision
-
-The owner explicitly requested v1 publication on 2026-11-11 and assigned device testing to themselves. This changes the publication gate; it does not turn outstanding device checks into passes. Current analysis passes, and 21 automated test cases have passed across the full suite and focused follow-ups. The latest signed ARM64 artifact is independently verified before upload. The release build information and checksum assets identify the published binary.
+Mihon imports cover saved titles, source IDs, metadata, chapters, read state, page positions, bookmarks, categories and history. Multiple categories become a combined category. Tracker sessions, credentials, extension APKs and source preferences are excluded. Existing Dream Reader records are preserved. Backup download inventory contains metadata, not downloaded image files.
 
 
 <!-- /coderabbit-ai-generated:v1 -->

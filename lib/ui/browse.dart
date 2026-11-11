@@ -22,9 +22,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
   String query = '', language = 'all';
   bool mature = false;
   String? installing;
+  final queryController = TextEditingController();
+  @override
+  void dispose() {
+    queryController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final languages =
+        state.catalogue
+            .expand((e) => e.sources.map((s) => s.language))
+            .where((language) => language != 'all')
+            .toSet()
+            .toList()
+          ..sort();
+    languages.insert(0, 'all');
+    // A removed repository may remove the selected language entirely.
+    if (!languages.contains(language)) language = 'all';
     final extensions = state.catalogue
         .where(
           (e) =>
@@ -40,10 +57,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
               '${s['name']}'.toLowerCase().contains(query.trim().toLowerCase()),
         )
         .toList();
-    final languages = {
-      'all',
-      ...state.catalogue.expand((e) => e.sources.map((s) => s.language)),
-    }.toList()..sort();
     return NestedScrollView(
       headerSliverBuilder: (context, scrolled) => [
         SliverToBoxAdapter(
@@ -134,16 +147,28 @@ class _BrowseScreenState extends State<BrowseScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                 child: TextField(
+                  controller: queryController,
                   onChanged: (s) => setState(() => query = s),
                   decoration: InputDecoration(
                     hintText: section == 0
                         ? 'Search installed sources'
                         : 'Search the live catalogue',
                     prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear source search',
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => setState(() {
+                              query = '';
+                              queryController.clear();
+                            }),
+                          ),
                   ),
                 ),
               ),
-              if (state.syncing) const LinearProgressIndicator(),
+              if (state.syncing || (section == 0 && state.sourcesLoading))
+                const LinearProgressIndicator(),
               if (state.syncError != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -198,7 +223,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ),
       ],
       body: section == 0
-          ? sources.isEmpty
+          ? sources.isEmpty && state.sourcesLoading
+                ? Center(
+                    child: Semantics(
+                      label: 'Loading installed sources',
+                      child: const CircularProgressIndicator(),
+                    ),
+                  )
+                : sources.isEmpty
                 ? ListView(
                     children: [
                       EmptyState(
@@ -469,6 +501,8 @@ class _SourceScreenState extends State<SourceScreen> {
   bool loading = false, hasNext = true;
   String mode = 'popular';
   Object? error;
+  int generation = 0;
+  bool reloadQueued = false;
   @override
   void initState() {
     super.initState();
@@ -477,12 +511,24 @@ class _SourceScreenState extends State<SourceScreen> {
 
   @override
   void dispose() {
+    generation++;
     search.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool reset = false}) async {
-    if (loading) return;
+    if (loading) {
+      if (reset) {
+        reloadQueued = true;
+        generation++;
+        setState(() {
+          items.clear();
+          error = null;
+        });
+      }
+      return;
+    }
+    final current = ++generation;
     setState(() {
       loading = true;
       error = null;
@@ -500,20 +546,26 @@ class _SourceScreenState extends State<SourceScreen> {
         mode: mode,
         filters: filters,
       );
-      if (!mounted) return;
+      if (!mounted || current != generation) return;
       setState(() {
-        items.addAll(
-          (result['items'] as List).map(
-            (m) => Manga.fromJson(Map<String, dynamic>.from(m)),
-          ),
-        );
+        final keys = items.map((m) => m.key).toSet();
+        for (final json in result['items'] as List) {
+          final manga = Manga.fromJson(Map<String, dynamic>.from(json));
+          if (keys.add(manga.key)) items.add(manga);
+        }
         hasNext = result['hasNext'] == true;
         page++;
       });
     } catch (e) {
-      if (mounted) setState(() => error = e);
+      if (mounted && current == generation) setState(() => error = e);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+        if (reloadQueued) {
+          reloadQueued = false;
+          _load(reset: true);
+        }
+      }
     }
   }
 
@@ -631,9 +683,12 @@ class _SourceScreenState extends State<SourceScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       sliver: SliverGrid.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: MediaQuery.sizeOf(context).width > 700
-                              ? 6
-                              : 3,
+                          crossAxisCount:
+                              MediaQuery.textScalerOf(context).scale(1) > 1.5
+                              ? (MediaQuery.sizeOf(context).width > 700 ? 4 : 2)
+                              : (MediaQuery.sizeOf(context).width > 700
+                                    ? 6
+                                    : 3),
                           childAspectRatio: .55,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 22,
@@ -641,8 +696,13 @@ class _SourceScreenState extends State<SourceScreen> {
                         itemCount: items.length,
                         itemBuilder: (_, i) => MangaCard(
                           items[i],
-                          onTap: () =>
-                              openManga(context, widget.state, items[i]),
+                          heroTag: 'source:$i:${items[i].key}',
+                          onTap: () => openManga(
+                            context,
+                            widget.state,
+                            items[i],
+                            coverHeroTag: 'source:$i:${items[i].key}',
+                          ),
                         ),
                       ),
                     ),

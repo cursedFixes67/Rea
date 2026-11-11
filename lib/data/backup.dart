@@ -6,9 +6,10 @@ import 'package:crypto/crypto.dart';
 import 'backup_settings.dart';
 
 class BackupCodec {
+  static const maxEncodedBytes = 64 * 1024 * 1024;
   static Uint8List encode(Map<String, dynamic> payload) {
     final data = jsonEncode(payload);
-    return Uint8List.fromList(
+    final bytes = Uint8List.fromList(
       utf8.encode(
         jsonEncode({
           'format': 'dream-reader-backup',
@@ -18,10 +19,16 @@ class BackupCodec {
         }),
       ),
     );
+    if (bytes.length > maxEncodedBytes) {
+      throw const FormatException(
+        'Backup exceeds the supported 64 MiB restore size',
+      );
+    }
+    return bytes;
   }
 
   static Map<String, dynamic> decode(Uint8List bytes) {
-    if (bytes.length > 64 * 1024 * 1024) {
+    if (bytes.length > maxEncodedBytes) {
       throw const FormatException('Backup exceeds 64 MiB');
     }
     final envelope = jsonDecode(utf8.decode(bytes));

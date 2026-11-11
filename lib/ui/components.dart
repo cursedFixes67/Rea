@@ -92,12 +92,14 @@ class MangaCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool selected;
+  final Object? heroTag;
   const MangaCard(
     this.manga, {
     super.key,
     required this.onTap,
     this.onLongPress,
     this.selected = false,
+    this.heroTag,
   });
   @override
   Widget build(BuildContext context) => Semantics(
@@ -115,7 +117,9 @@ class MangaCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CoverImage(manga.cover),
+                heroTag == null
+                    ? CoverImage(manga.cover)
+                    : Hero(tag: heroTag!, child: CoverImage(manga.cover)),
                 if (selected)
                   Container(
                     decoration: BoxDecoration(

@@ -15,8 +15,9 @@ python3 -m unittest discover -s scripts/tests -v
 "$flutter_command" build apk --release --target-platform android-arm64 --obfuscate --split-debug-info="$symbol_directory"
 mkdir -p "$output_directory"
 cp build/app/outputs/flutter-apk/app-release.apk "$output_directory/DreamReader-arm64-release.apk"
+cp docs/installation.md "$output_directory/INSTALLATION.md"
 python3 scripts/verify_apk.py "$output_directory/DreamReader-arm64-release.apk" --build-tools "$build_tools"
 # Freeze the production artifact before regenerating development plugin bindings
 # for host-side Android unit tests. Test-only dependencies never enter the APK.
 "$flutter_command" pub get --enforce-lockfile
-(cd android && ./gradlew :app:testReleaseUnitTest -Ptarget-platform=android-arm64 -PdreamReleaseTest)
+(cd android && ./gradlew :app:testReleaseUnitTest :app:assembleReleaseAndroidTest -Ptarget-platform=android-arm64 -PdreamReleaseTest)

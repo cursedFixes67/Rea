@@ -13,7 +13,13 @@ import 'tracking.dart';
 class MangaDetailsScreen extends StatefulWidget {
   final AppState state;
   final Manga initial;
-  const MangaDetailsScreen(this.state, this.initial, {super.key});
+  final Object? coverHeroTag;
+  const MangaDetailsScreen(
+    this.state,
+    this.initial, {
+    super.key,
+    this.coverHeroTag,
+  });
   @override
   State<MangaDetailsScreen> createState() => _MangaDetailsScreenState();
 }
@@ -115,6 +121,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
         chapters = progress
             .map((e) => Chapter.fromJson(jsonDecode(e.payload)))
             .toList();
+        // Keep saved chapters usable while the remote source refreshes.
+        if (mounted) setState(() {});
       }
       final result = await widget.state.engine.details(manga);
       manga = Manga.fromJson(Map<String, dynamic>.from(result['manga']));
@@ -218,76 +226,98 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Hero(
-                        tag: manga.key,
-                        child: CoverImage(manga.cover, width: 124, height: 180),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked =
+                          constraints.maxWidth < 360 &&
+                          MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                      final cover = widget.coverHeroTag == null
+                          ? CoverImage(manga.cover, width: 124, height: 180)
+                          : Hero(
+                              tag: widget.coverHeroTag!,
+                              child: CoverImage(
+                                manga.cover,
+                                width: 124,
+                                height: 180,
+                              ),
+                            );
+                      final info = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            manga.title,
+                            style: const TextStyle(
+                              fontFamily: 'Newsreader',
+                              fontSize: 28,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          if (manga.author.isNotEmpty)
                             Text(
-                              manga.title,
-                              style: const TextStyle(
-                                fontFamily: 'Newsreader',
-                                fontSize: 28,
-                                height: 1.1,
+                              manga.author,
+                              style: TextStyle(
+                                color: mutedColor(context),
+                                fontSize: 12,
                               ),
                             ),
-                            const SizedBox(height: 14),
-                            if (manga.author.isNotEmpty)
-                              Text(
-                                manga.author,
+                          if (manga.artist.isNotEmpty &&
+                              manga.artist != manga.author)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                'Art · ${manga.artist}',
                                 style: TextStyle(
                                   color: mutedColor(context),
                                   fontSize: 12,
                                 ),
                               ),
-                            if (manga.artist.isNotEmpty &&
-                                manga.artist != manga.author)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  'Art · ${manga.artist}',
-                                  style: TextStyle(
-                                    color: mutedColor(context),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(height: 12),
-                            Text(
-                              switch (manga.status) {
-                                1 => 'Ongoing',
-                                2 => 'Completed',
-                                3 => 'Licensed',
-                                4 => 'Publishing finished',
-                                5 => 'Cancelled',
-                                6 => 'On hiatus',
-                                _ => 'Status unknown',
-                              },
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
                             ),
-                            const SizedBox(height: 14),
-                            Text(
-                              '${chapters.length} chapters',
-                              style: TextStyle(
-                                color: mutedColor(context),
-                                fontSize: 11,
-                              ),
+                          const SizedBox(height: 12),
+                          Text(
+                            switch (manga.status) {
+                              1 => 'Ongoing',
+                              2 => 'Completed',
+                              3 => 'Licensed',
+                              4 => 'Publishing finished',
+                              5 => 'Cancelled',
+                              6 => 'On hiatus',
+                              _ => 'Status unknown',
+                            },
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            '${chapters.length} chapters',
+                            style: TextStyle(
+                              color: mutedColor(context),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      );
+                      return stacked
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                cover,
+                                const SizedBox(height: 20),
+                                info,
+                              ],
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                cover,
+                                const SizedBox(width: 24),
+                                Expanded(child: info),
+                              ],
+                            );
+                    },
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -424,14 +454,15 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Row(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Expanded(
-                              child: Text(
-                                batchDownloading
-                                    ? 'Preparing $batchDone / ${selected.length}'
-                                    : '${selected.length} selected',
-                              ),
+                            Text(
+                              batchDownloading
+                                  ? 'Preparing $batchDone / ${selected.length}'
+                                  : '${selected.length} selected',
                             ),
                             if (!batchDownloading)
                               IconButton(

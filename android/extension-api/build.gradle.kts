@@ -11,6 +11,8 @@ android {
 }
 kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17 } }
 dependencies {
+    // Same immutable engine revision as the pinned Mihon source API.
+    api("com.github.zhanghai.quickjs-java:quickjs-android:547f5b1597")
     api("com.squareup.okhttp3:okhttp:5.5.1")
     api("com.squareup.okhttp3:okhttp-brotli:5.5.1")
     api("com.squareup.okhttp3:okhttp-zstd:5.5.1")

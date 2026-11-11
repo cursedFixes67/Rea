@@ -24,6 +24,9 @@ class _DownloadsScreenState extends State<DownloadsScreen>
   Object? error;
   bool polling = false;
   final pending = <String>{};
+  final selected = <String>{};
+  bool selecting = false, batchBusy = false;
+  String filter = 'all';
   @override
   void initState() {
     super.initState();
@@ -78,6 +81,7 @@ class _DownloadsScreenState extends State<DownloadsScreen>
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
           error = null;
+          selected.retainAll(jobs.map((j) => '${j['id']}'));
         });
       }
     } catch (e) {
@@ -176,153 +180,336 @@ class _DownloadsScreenState extends State<DownloadsScreen>
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, 10),
-        child: Text(
-          'Downloads',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.8,
+  Future<void> _deleteSelected() async {
+    final ids = Set<String>.from(selected);
+    if (ids.isEmpty || batchBusy) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${ids.length} downloaded chapters?'),
+        content: const Text(
+          'Downloaded images will be removed. Your library and reading progress will be kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete chapters'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+    setState(() {
+      batchBusy = true;
+      pending.addAll(ids);
+    });
+    var failed = 0;
+    for (final id in ids) {
+      try {
+        await widget.state.engine.call('downloadControl', {
+          'id': id,
+          'action': 'delete',
+        });
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      batchBusy = false;
+      pending.removeAll(ids);
+      selected.clear();
+      selecting = false;
+    });
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            failed == 0
+                ? '${ids.length} chapters deleted'
+                : '${ids.length - failed} deleted; $failed could not be deleted. Try again.',
           ),
         ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        child: Text(
-          '${jobs.where((j) => j['status'] == 'SUCCEEDED').length} chapters ready offline',
-          style: TextStyle(color: mutedColor(context), fontSize: 12),
-        ),
-      ),
-      Expanded(
-        child: error != null
-            ? ErrorNotice(error!, retry: _load)
-            : jobs.isEmpty
-            ? const EmptyState(
-                icon: Icons.cloud_download_outlined,
-                title: 'Read without a connection',
-                message: 'Download chapters from a title’s page and read them anywhere. Downloads continue in the background and resume completed pages after interruptions.',
-              )
-            : ListView.builder(
-                itemCount: jobs.length,
-                itemBuilder: (_, i) {
-                  final job = jobs[i];
-                  final running = [
-                    'RUNNING',
-                    'ENQUEUED',
-                    'BLOCKED',
-                  ].contains(job['status']);
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 8,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${job['title']}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              if (pending.contains('${job['id']}'))
-                                const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: SizedBox.square(
-                                    dimension: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                )
-                              else
-                                PopupMenuButton<String>(
-                                  onSelected: (action) => _control(job, action),
-                                  itemBuilder: (_) => [
-                                    if (job['status'] != 'SUCCEEDED')
-                                      PopupMenuItem(
-                                        value: running ? 'pause' : 'resume',
-                                        child: Text(
-                                          running ? 'Pause' : 'Resume / retry',
-                                        ),
-                                      ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                          Text(
-                            '${job['chapter']}',
-                            style: TextStyle(
-                              color: mutedColor(context),
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          LinearProgressIndicator(
-                            value:
-                                (job['completed'] as num) /
-                                (job['total'] as num).clamp(1, 100000),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${job['completed']} / ${job['total']} pages · ${_status('${job['status']}')}',
-                            style: TextStyle(
-                              color: mutedColor(context),
-                              fontSize: 10,
-                            ),
-                          ),
-                          if (job['status'] == 'SUCCEEDED')
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: pending.contains('${job['id']}')
-                                    ? null
-                                    : () => _readOffline(job),
-                                icon: const Icon(
-                                  Icons.auto_stories_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Read offline'),
-                              ),
-                            ),
-                          if ('${job['error']}'.isNotEmpty)
-                            Text(
-                              '${job['error']}',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontSize: 11,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+      );
+    }
+  }
+
+  String _space(int bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024).ceil()} KB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = jobs.where((j) => j['status'] == 'SUCCEEDED').length;
+    final bytes = jobs.fold<int>(
+      0,
+      (sum, j) => sum + (j['bytes'] as num? ?? 0).toInt(),
+    );
+    final visible = jobs
+        .where(
+          (j) => switch (filter) {
+            'ready' => j['status'] == 'SUCCEEDED',
+            'active' => [
+              'RUNNING',
+              'ENQUEUED',
+              'BLOCKED',
+            ].contains(j['status']),
+            _ => true,
+          },
+        )
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 18, 12, 8),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Downloads',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.8,
+                  ),
+                ),
               ),
-      ),
-    ],
-  );
+              if (jobs.isNotEmpty)
+                IconButton(
+                  tooltip: selecting ? 'Finish selecting' : 'Select chapters',
+                  onPressed: batchBusy
+                      ? null
+                      : () => setState(() {
+                          selecting = !selecting;
+                          selected.clear();
+                        }),
+                  icon: Icon(selecting ? Icons.close : Icons.checklist),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+          child: Text(
+            '$ready chapters ready offline · ${_space(bytes)} used',
+            style: TextStyle(color: mutedColor(context), fontSize: 12),
+          ),
+        ),
+        if (jobs.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 6, 24, 8),
+            child: selecting
+                ? Wrap(
+                    spacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('${selected.length} selected'),
+                      TextButton(
+                        onPressed: batchBusy
+                            ? null
+                            : () => setState(
+                                () => selected.addAll(
+                                  visible.map((j) => '${j['id']}'),
+                                ),
+                              ),
+                        child: const Text('Select visible'),
+                      ),
+                      TextButton.icon(
+                        onPressed: selected.isEmpty || batchBusy
+                            ? null
+                            : _deleteSelected,
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Delete'),
+                      ),
+                    ],
+                  )
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children:
+                        {
+                              'all': 'All',
+                              'active': 'Active',
+                              'ready': 'Ready offline',
+                            }.entries
+                            .map(
+                              (entry) => ChoiceChip(
+                                label: Text(entry.value),
+                                selected: filter == entry.key,
+                                onSelected: (_) =>
+                                    setState(() => filter = entry.key),
+                              ),
+                            )
+                            .toList(),
+                  ),
+          ),
+        if (batchBusy) const LinearProgressIndicator(),
+        Expanded(
+          child: error != null
+              ? ErrorNotice(error!, retry: _load)
+              : jobs.isEmpty
+              ? const EmptyState(
+                  icon: Icons.cloud_download_outlined,
+                  title: 'Read without a connection',
+                  message: 'Download chapters from a title’s page and read them anywhere. Downloads continue in the background and resume completed pages after interruptions.',
+                )
+              : visible.isEmpty
+              ? const EmptyState(
+                  icon: Icons.filter_alt_off_outlined,
+                  title: 'No chapters in this view',
+                  message: 'Choose All to see your complete download queue.',
+                )
+              : ListView.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (_, i) {
+                    final job = visible[i];
+                    final running = [
+                      'RUNNING',
+                      'ENQUEUED',
+                      'BLOCKED',
+                    ].contains(job['status']);
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${job['title']}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                if (selecting)
+                                  Checkbox(
+                                    semanticLabel: 'Select ${job['chapter']}',
+                                    value: selected.contains('${job['id']}'),
+                                    onChanged: batchBusy
+                                        ? null
+                                        : (value) => setState(() {
+                                            if (value == true) {
+                                              selected.add('${job['id']}');
+                                            } else {
+                                              selected.remove('${job['id']}');
+                                            }
+                                          }),
+                                  )
+                                else if (pending.contains('${job['id']}'))
+                                  const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  PopupMenuButton<String>(
+                                    onSelected: (action) =>
+                                        _control(job, action),
+                                    itemBuilder: (_) => [
+                                      if (![
+                                        'SUCCEEDED',
+                                        'CORRUPT',
+                                      ].contains(job['status']))
+                                        PopupMenuItem(
+                                          value: running ? 'pause' : 'resume',
+                                          child: Text(
+                                            running
+                                                ? 'Pause'
+                                                : 'Resume / retry',
+                                          ),
+                                        ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                            Text(
+                              '${job['chapter']}',
+                              style: TextStyle(
+                                color: mutedColor(context),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            LinearProgressIndicator(
+                              value:
+                                  (job['completed'] as num) /
+                                  (job['total'] as num).clamp(1, 100000),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${job['completed']} / ${job['total']} pages · ${_status('${job['status']}')}',
+                              style: TextStyle(
+                                color: mutedColor(context),
+                                fontSize: 10,
+                              ),
+                            ),
+                            if (job['status'] == 'SUCCEEDED')
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: pending.contains('${job['id']}')
+                                      ? null
+                                      : () => _readOffline(job),
+                                  icon: const Icon(
+                                    Icons.auto_stories_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Read offline'),
+                                ),
+                              ),
+                            if ('${job['error']}'.isNotEmpty)
+                              Text(
+                                '${job['error']}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
   String _status(String value) => switch (value) {
     'SUCCEEDED' => 'Ready offline',
     'RUNNING' => 'Downloading',
     'ENQUEUED' => 'Queued / waiting for network',
     'CANCELLED' => 'Paused',
     'FAILED' => 'Failed — tap menu to retry',
+    'CORRUPT' => 'Download again from its source',
     _ => value.toLowerCase(),
   };
 }

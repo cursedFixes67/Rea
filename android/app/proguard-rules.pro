@@ -9,6 +9,7 @@
 -keep class okio.** { *; }
 # Current KeiSource filter caches call these Kotlin top-level APIs directly.
 -keep class com.squareup.zstd.** { *; }
+-keep class app.cash.quickjs.** { *; }
 -keep class org.jsoup.** { *; }
 -keep class kotlinx.serialization.** { *; }
 -keep class kotlinx.coroutines.** { *; }

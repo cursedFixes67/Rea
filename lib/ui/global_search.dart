@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
 import '../domain/models.dart';
+import '../domain/failure_message.dart';
 import 'components.dart';
 import 'shell.dart' show openManga;
 
@@ -32,6 +33,8 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
               .where((s) => s['language'] == 'en')
               .map((s) => '${s['id']}'),
     );
+    final installedIds = widget.state.sources.map((s) => '${s['id']}').toSet();
+    selected.retainAll(installedIds);
     if (selected.isEmpty && widget.state.sources.isNotEmpty) {
       selected.add('${widget.state.sources.first['id']}');
     }
@@ -73,7 +76,10 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           );
         } catch (error) {
           if (!mounted || generation != current) return;
-          setState(() => errors[id] = '${source['name']}: $error');
+          setState(
+            () => errors[id] =
+                '${source['name']}: ${FailureMessage.from(error).message}',
+          );
         } finally {
           if (mounted && generation == current) setState(() => pending--);
         }
@@ -149,11 +155,11 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Find a new obsession'),
+      title: const Text('Search sources'),
       actions: [
         IconButton(
           tooltip: 'Choose sources',
-          onPressed: chooseSources,
+          onPressed: widget.state.sources.isEmpty ? null : chooseSources,
           icon: const Icon(Icons.tune),
         ),
       ],
@@ -186,10 +192,18 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
               if (selected.isEmpty)
                 EmptyState(
                   icon: Icons.travel_explore,
-                  title: 'Choose where to look',
-                  message: 'Select installed sources to search their current catalogues.',
-                  action: 'Choose sources',
-                  onAction: chooseSources,
+                  title: widget.state.sources.isEmpty
+                      ? 'Install a source first'
+                      : 'Choose where to look',
+                  message: widget.state.sources.isEmpty
+                      ? 'Add a source from Browse to search its titles.'
+                      : 'Select installed sources to search their current catalogues.',
+                  action: widget.state.sources.isEmpty
+                      ? 'Back to Browse'
+                      : 'Choose sources',
+                  onAction: widget.state.sources.isEmpty
+                      ? () => Navigator.maybePop(context)
+                      : chooseSources,
                 ),
               if (results.isEmpty &&
                   errors.isEmpty &&

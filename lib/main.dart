@@ -15,6 +15,7 @@ Future<void> main() async {
       'Mihon-Apache-2.0',
       'TachiyomiX-Apache-2.0',
       'Keiyoushi-Apache-2.0',
+      'QuickJS-Licenses',
       'Manrope-OFL',
       'Newsreader-OFL',
     ]) {

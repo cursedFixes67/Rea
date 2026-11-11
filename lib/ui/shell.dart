@@ -120,14 +120,24 @@ class _DreamShellState extends State<DreamShell> {
         onDownloads: () => setState(() => tab = 4),
         onLibrary: () => setState(() => tab = 1),
       ),
-      LibraryScreen(widget.state),
+      LibraryScreen(widget.state, active: tab == 1),
       BrowseScreen(widget.state),
       UpdatesScreen(widget.state),
       DownloadsScreen(widget.state, active: tab == 4),
     ];
     return Scaffold(
       body: SafeArea(
-        child: IndexedStack(index: tab, children: pages),
+        child: IndexedStack(
+          index: tab,
+          children: [
+            for (var index = 0; index < pages.length; index++)
+              HeroMode(
+                enabled:
+                    tab == index && !MediaQuery.disableAnimationsOf(context),
+                child: TickerMode(enabled: tab == index, child: pages[index]),
+              ),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
@@ -164,15 +174,23 @@ class _DreamShellState extends State<DreamShell> {
   }
 }
 
-void openManga(BuildContext context, AppState state, Manga manga) =>
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => MangaDetailsScreen(state, manga)),
-    );
+Future<void> openManga(
+  BuildContext context,
+  AppState state,
+  Manga manga, {
+  Object? coverHeroTag,
+}) => Navigator.push<void>(
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        MangaDetailsScreen(state, manga, coverHeroTag: coverHeroTag),
+  ),
+);
 
 class LibraryScreen extends StatefulWidget {
   final AppState state;
-  const LibraryScreen(this.state, {super.key});
+  final bool active;
+  const LibraryScreen(this.state, {super.key, this.active = true});
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
@@ -180,9 +198,72 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   String query = '', category = 'All';
   String readingFilter = 'all', statusFilter = 'all', sort = 'added';
-  bool list = false;
+  bool list = false, downloadedOnly = false;
   int columns = 3;
+  final queryController = TextEditingController();
+  final downloadedCounts = <String, int>{};
   final selected = <String>{};
+  @override
+  void initState() {
+    super.initState();
+    list = widget.state.preferences.getString('libraryLayout') == 'list';
+    columns = (widget.state.preferences.getInt('libraryColumns') ?? 3).clamp(
+      2,
+      5,
+    );
+    final savedSort = widget.state.preferences.getString('librarySort');
+    if ({'added', 'title', 'recent', 'unread'}.contains(savedSort)) {
+      sort = savedSort!;
+    }
+    if (widget.active) _loadDownloadedCounts();
+  }
+
+  @override
+  void didUpdateWidget(LibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _loadDownloadedCounts();
+  }
+
+  Future<void> _loadDownloadedCounts() async {
+    if (!widget.state.engine.available) return;
+    try {
+      final jobs = await widget.state.engine.call('downloadList') as List;
+      if (!mounted) return;
+      setState(() {
+        downloadedCounts.clear();
+        for (final job in jobs.where((j) => j['status'] == 'SUCCEEDED')) {
+          final key = '${job['mangaKey']}';
+          downloadedCounts[key] = (downloadedCounts[key] ?? 0) + 1;
+        }
+      });
+    } catch (_) {
+      /* Offline badges refresh on the next library visit. */
+    }
+  }
+
+  Future<void> _saveLayout() async {
+    await widget.state.preferences.setString(
+      'libraryLayout',
+      list ? 'list' : 'grid',
+    );
+    await widget.state.preferences.setInt('libraryColumns', columns);
+    await widget.state.preferences.setString('librarySort', sort);
+  }
+
+  void _clearFilters() => setState(() {
+    query = '';
+    queryController.clear();
+    category = 'All';
+    readingFilter = 'all';
+    statusFilter = 'all';
+    downloadedOnly = false;
+  });
+  @override
+  void dispose() {
+    queryController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
@@ -193,7 +274,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final entries = state.library
         .where(
           (r) =>
-              r.title.toLowerCase().contains(query.toLowerCase()) &&
+              r.title.toLowerCase().contains(query.trim().toLowerCase()) &&
+              (!downloadedOnly || (downloadedCounts[r.key] ?? 0) > 0) &&
               (category == 'All' || category == r.category) &&
               (readingFilter == 'all' ||
                   (readingFilter == 'unread' &&
@@ -280,10 +362,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   icon: Icon(Icons.tune),
                 ),
                 PopupMenuButton<String>(
-                  onSelected: (v) => setState(() {
-                    list = v == 'list';
-                    columns = v == 'compact' ? 4 : 3;
-                  }),
+                  tooltip: 'Library layout',
+                  onSelected: (v) async {
+                    setState(() {
+                      list = v == 'list';
+                      columns = v == 'compact' ? 4 : 3;
+                    });
+                    await _saveLayout();
+                  },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'grid', child: Text('Cover grid')),
                     PopupMenuItem(
@@ -300,6 +386,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: TextField(
+            controller: queryController,
             onChanged: (s) => setState(() => query = s),
             decoration: const InputDecoration(
               hintText: 'Find a story in your library',
@@ -308,7 +395,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ),
         SizedBox(
-          height: 45,
+          height: MediaQuery.textScalerOf(context).scale(18) + 36,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             scrollDirection: Axis.horizontal,
@@ -324,10 +411,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
         const SizedBox(height: 10),
         Expanded(
           child: entries.isEmpty
-              ? const EmptyState(
+              ? EmptyState(
                   icon: Icons.library_books_outlined,
-                  title: 'Your library is empty',
-                  message: 'Save titles from Browse to build your collection. Long-press a cover to organize titles into categories.',
+                  title: state.library.isEmpty
+                      ? 'Your library is empty'
+                      : 'No matching titles',
+                  message: state.library.isEmpty
+                      ? 'Save titles from Browse to build your collection. Long-press a cover to organize titles into categories.'
+                      : 'Try another search or clear your category and reading filters.',
+                  action: state.library.isEmpty ? null : 'Clear filters',
+                  onAction: state.library.isEmpty ? null : _clearFilters,
                 )
               : list
               ? ListView.builder(
@@ -339,10 +432,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         horizontal: 24,
                         vertical: 8,
                       ),
-                      leading: CoverImage(manga.cover, width: 45, height: 65),
+                      leading: Hero(
+                        tag: 'library:${manga.key}',
+                        child: CoverImage(manga.cover, width: 45, height: 65),
+                      ),
                       title: Text(manga.title),
                       subtitle: Text(
-                        '${entries[i].category} · ${_unread(manga.key)} unread',
+                        '${entries[i].category} · ${_unread(manga.key)} unread${downloadedCounts[manga.key] == null ? '' : ' · ${downloadedCounts[manga.key]} offline'}',
                       ),
                       onTap: () => _tap(manga),
                       onLongPress: () =>
@@ -354,7 +450,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
               : GridView.builder(
                   padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: MediaQuery.sizeOf(context).width > 700
+                    crossAxisCount:
+                        MediaQuery.textScalerOf(context).scale(1) > 1.5
+                        ? (MediaQuery.sizeOf(context).width > 700 ? 4 : 2)
+                        : MediaQuery.sizeOf(context).width > 700
                         ? columns * 2
                         : columns,
                     crossAxisSpacing: 12,
@@ -368,11 +467,39 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       children: [
                         MangaCard(
                           manga,
+                          heroTag: 'library:${manga.key}',
                           selected: selected.contains(manga.key),
                           onTap: () => _tap(manga),
                           onLongPress: () =>
                               setState(() => selected.add(manga.key)),
                         ),
+                        if ((downloadedCounts[manga.key] ?? 0) > 0)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IgnorePointer(
+                              child: Tooltip(
+                                message:
+                                    '${downloadedCounts[manga.key]} downloaded chapters',
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .surface,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Icon(
+                                    Icons.download_done,
+                                    size: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         if (_unread(manga.key) > 0)
                           Positioned(
                             top: 8,
@@ -476,6 +603,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 selected: sort == e.key,
                                 onSelected: (_) {
                                   setState(() => sort = e.key);
+                                  _saveLayout();
                                   update(() {});
                                 },
                               ),
@@ -483,6 +611,36 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             .toList(),
                   ),
                   const SizedBox(height: 20),
+                  if (!list) ...[
+                    const Text('Cover density'),
+                    Slider(
+                      value: columns.toDouble(),
+                      min: 2,
+                      max: 5,
+                      divisions: 3,
+                      label: columns <= 2
+                          ? 'Large covers'
+                          : columns >= 5
+                          ? 'Small covers'
+                          : 'Balanced',
+                      onChanged: (value) {
+                        setState(() => columns = value.round());
+                        update(() {});
+                      },
+                      onChangeEnd: (_) => _saveLayout(),
+                    ),
+                  ],
+                  if (widget.state.engine.available)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Available offline'),
+                      subtitle: const Text('At least one downloaded chapter'),
+                      value: downloadedOnly,
+                      onChanged: (value) {
+                        setState(() => downloadedOnly = value);
+                        update(() {});
+                      },
+                    ),
                   const Text('Smart collection'),
                   Wrap(
                     spacing: 8,
@@ -546,9 +704,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  void _tap(Manga manga) {
+  Future<void> _tap(Manga manga) async {
     if (selected.isEmpty) {
-      openManga(context, widget.state, manga);
+      await openManga(
+        context,
+        widget.state,
+        manga,
+        coverHeroTag: 'library:${manga.key}',
+      );
+      await _loadDownloadedCounts();
     } else {
       setState(
         () => selected.contains(manga.key)

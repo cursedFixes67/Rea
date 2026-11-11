@@ -62,11 +62,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _discover() {
+    if (hidden.contains('popular')) return;
     final source =
         widget.state.sources.where((s) => s['language'] == 'en').firstOrNull ??
         widget.state.sources.firstOrNull;
     final id = source?['id'] as String?;
-    if (id != null && id != popularSource) {
+    if (id == null) {
+      popularSource = null;
+      popular = null;
+      return;
+    }
+    if (id != popularSource) {
       popularSource = id;
       popular = widget.state.engine.browse(id);
     }
@@ -115,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             hidden.add(key);
                           }
                         });
+                        _discover();
                         update(() {});
                       },
                     );
@@ -174,7 +181,13 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 144,
             child: MangaCard(
               items[index],
-              onTap: () => openManga(context, widget.state, items[index]),
+              heroTag: 'home:$title:$index:${items[index].key}',
+              onTap: () => openManga(
+                context,
+                widget.state,
+                items[index],
+                coverHeroTag: 'home:$title:$index:${items[index].key}',
+              ),
             ),
           ),
         ),

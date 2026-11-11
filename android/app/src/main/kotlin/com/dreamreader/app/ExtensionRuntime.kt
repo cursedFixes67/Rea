@@ -36,7 +36,10 @@ class ExtensionRuntime private constructor(private val context: Context) {
     private val network = NetworkHelper(context)
     private val sources = linkedMapOf<String, Source>()
     private val sourcePackages = mutableMapOf<String, String>()
+    private val sourceDescriptions = linkedMapOf<String, JSONObject>()
     private val mutex = Mutex()
+    private val lifecycle = ExtensionGate()
+    private val requests = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
     private val imageLocks = Array(64) { Mutex() }
     private var loaded = false
     private var errors = JSONArray()
@@ -98,14 +101,15 @@ class ExtensionRuntime private constructor(private val context: Context) {
     }
     private fun ensureLoaded() {
         if (loaded) return
-        sources.clear(); sourcePackages.clear(); errors = JSONArray()
+        sources.clear(); sourcePackages.clear(); sourceDescriptions.clear(); errors = JSONArray()
         val entries = registry()
         entries.keys().forEach { pkg ->
             try {
-                load(packageFile(pkg), entries.getJSONObject(pkg)).forEach { source ->
-                    val id = source.id.toString()
-                    check(!sources.containsKey(id)) { "Duplicate source identifier $id" }
-                    sources[id] = source; sourcePackages[id] = pkg
+                prepareSources(pkg, load(packageFile(pkg), entries.getJSONObject(pkg)), sourcePackages,
+                    { it.id.toString() }, { sourceJson(it, pkg) }).forEach { entry ->
+                    sources[entry.id] = entry.source
+                    sourcePackages[entry.id] = pkg
+                    sourceDescriptions[entry.id] = entry.description
                 }
             } catch (error: Throwable) {
                 errors.put(JSONObject().put("packageName", pkg).put("message", SourceErrors.describe(error)))
@@ -113,27 +117,37 @@ class ExtensionRuntime private constructor(private val context: Context) {
         }
         loaded = true
     }
-    suspend fun execute(method: String, args: JSONObject): Any {
-        if (method == "image") return withContext(Dispatchers.IO) {
-            val source = mutex.withLock { ensureLoaded(); sources[args.getString("sourceId")] ?: error("Source is not loaded") }
-            val page = args.getJSONObject("page")
-            val key = "${source.id}:${page.getString("url")}".hashCode() and 63
-            imageLocks[key].withLock { image(source, page) }
-        }
-        return mutex.withLock { withContext(Dispatchers.IO) {
-            when (method) {
-                "install" -> install(args)
-                "uninstall" -> {
+    private suspend fun source(id: String): Source = mutex.withLock {
+        ensureLoaded()
+        sources[id] ?: error("Source is not loaded. Install its extension or review its compatibility error.")
+    }
+    suspend fun execute(method: String, args: JSONObject): Any = withContext(Dispatchers.IO) {
+        if (method == "install" || method == "uninstall") return@withContext lifecycle.write {
+            mutex.withLock {
+                val result = if (method == "install") install(args) else {
                     val pkg = args.getString("packageName"); val entries = registry()
                     check(packageFile(pkg).delete() || !packageFile(pkg).exists()) { "Could not remove extension" }
-                    entries.remove(pkg); saveRegistry(entries); loaded = false; JSONObject().put("removed", true)
+                    entries.remove(pkg); saveRegistry(entries); loaded = false
+                    JSONObject().put("removed", true)
                 }
-                "sources" -> { ensureLoaded(); JSONObject().put("sources", JSONArray(sources.values.map { sourceJson(it) })).put("errors", errors).put("installed", registry()) }
-                else -> {
-                    ensureLoaded()
-                    val source = sources[args.getString("sourceId")] ?: error("Source is not loaded. Install its extension or review its compatibility error.")
+                requests.clear()
+                result
+            }
+        }
+        lifecycle.read {
+            if (method == "sources") return@read mutex.withLock {
+                ensureLoaded()
+                JSONObject().put("sources", JSONArray(sourceDescriptions.values.toList()))
+                    .put("errors", errors).put("installed", registry())
+            }
+            val id = args.getString("sourceId")
+            val source = source(id)
+            if (method == "image") {
+                val page = args.getJSONObject("page")
+                val key = "$id:${page.getString("url")}".hashCode() and 63
+                imageLocks[key].withLock { image(source, page) }
+            } else requests.getOrPut(id) { Mutex() }.withLock {
                     when (method) {
-                        "image" -> image(source, args.getJSONObject("page"))
                         "filters" -> FilterCodec.describe(source.getFilterList())
                         "browse" -> {
                             val page = args.optInt("page", 1).coerceAtLeast(1)
@@ -168,10 +182,8 @@ class ExtensionRuntime private constructor(private val context: Context) {
                         }
                         else -> error("Unknown extension operation $method")
                     }
-                }
             }
         }
-    }
     }
     private suspend fun image(source: Source, json: JSONObject): JSONObject {
         val cache = File(context.cacheDir, "reader_images").apply { mkdirs() }
@@ -235,8 +247,9 @@ class ExtensionRuntime private constructor(private val context: Context) {
             verify(stage, entry)
             stage.setReadOnly()
             // Instantiate before replacing an existing file so ordinary linkage failures retain the old build.
-            val candidates = load(stage, entry)
-            check(candidates.isNotEmpty()) { "Extension contains no sources" }
+            ensureLoaded()
+            val candidates = prepareSources(pkg, load(stage, entry), sourcePackages,
+                { it.id.toString() }, { sourceJson(it, pkg) })
             if (target.exists()) check(target.renameTo(backup)) { "Could not retain previous version" }
             try {
                 check(stage.renameTo(target)) { "Could not install extension" }
@@ -244,17 +257,19 @@ class ExtensionRuntime private constructor(private val context: Context) {
             }
             catch (error: Exception) { target.delete(); if (backup.exists()) backup.renameTo(target); throw error }
             backup.delete(); loaded = false
-            return JSONObject().put("installed", true).put("sources", JSONArray(candidates.map { sourceJson(it) }))
+            return JSONObject().put("installed", true).put("sources", JSONArray(candidates.map { it.description }))
         } finally { stage.delete() }
     }
     fun userAgent(): String = network.defaultUserAgentProvider()
-    fun homeUrl(id: String): String { ensureLoaded(); return (sources[id] as? HttpSource)?.getHomeUrl() ?: error("Source has no website") }
-    fun configurableSource(id: String): ConfigurableSource {
-        ensureLoaded(); return sources[id] as? ConfigurableSource ?: error("This source has no preferences")
+    suspend fun homeUrl(id: String): String = lifecycle.read {
+        (source(id) as? HttpSource)?.getHomeUrl() ?: error("Source has no website")
     }
-    private fun sourceJson(source: Source) = JSONObject().put("id", source.id.toString()).put("name", source.name)
+    suspend fun configurableSource(id: String): ConfigurableSource = lifecycle.read {
+        source(id) as? ConfigurableSource ?: error("This source has no preferences")
+    }
+    private fun sourceJson(source: Source, packageName: String) = JSONObject().put("id", source.id.toString()).put("name", source.name)
         .put("language", source.lang).put("homeUrl", (source as? HttpSource)?.getHomeUrl() ?: "")
-        .put("preferences", source is ConfigurableSource).put("latest", source.supportsLatest).put("packageName", sourcePackages[source.id.toString()] ?: "")
+        .put("preferences", source is ConfigurableSource).put("latest", source.supportsLatest).put("packageName", packageName)
     private fun manga(j: JSONObject) = SManga.create().apply {
         url = j.getString("url"); title = j.optString("title"); thumbnail_url = j.optString("cover"); author = j.optString("author"); artist = j.optString("artist")
         description = j.optString("description"); genre = j.optString("genre"); status = j.optInt("status"); initialized = j.optBoolean("initialized")

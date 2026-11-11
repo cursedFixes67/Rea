@@ -59,7 +59,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           test -f "docs/releases/$RELEASE_TAG.md"
-          gh release create "$RELEASE_TAG" build/release/DreamReader-arm64-release.apk build/release/SHA256SUMS build/release/build-info.json --verify-tag --title "Dream Reader $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
+          gh release create "$RELEASE_TAG" build/release/DreamReader-arm64-release.apk build/release/SHA256SUMS build/release/build-info.json build/release/INSTALLATION.md --verify-tag --title "Dream Reader $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
       - name: Remove private signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/signing.properties"

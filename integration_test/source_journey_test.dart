@@ -25,6 +25,8 @@ void main() {
       final state = AppState(database, preferences);
       await state.initialize();
       await tester.pumpWidget(DreamReader(state: state));
+      // Local startup intentionally renders before third-party discovery.
+      await tester.runAsync(state.refreshSources);
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
         await state.finishOnboarding(true);

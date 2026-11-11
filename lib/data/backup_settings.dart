@@ -19,11 +19,14 @@ class BackupSettings {
       'accent',
       'downloadConcurrency',
       'interfaceDensity',
+      'libraryColumns',
     };
     const lists = {'searchHistory', 'searchSources', 'homeHidden', 'homeOrder'};
     const strings = {
       'readerMode',
       'interfaceFont',
+      'libraryLayout',
+      'librarySort',
       'bookmarks',
       'tracking.links',
       'tracking.client.anilist',
@@ -38,6 +41,16 @@ class BackupSettings {
           (lists.contains(key) &&
               (value is! List || value.any((v) => v is! String)))) {
         throw FormatException('Invalid type for backup setting "$key"');
+      }
+      if (key == 'libraryColumns' && ((value as int) < 2 || value > 5)) {
+        throw const FormatException('Unsupported cover density');
+      }
+      if (key == 'libraryLayout' && !{'grid', 'list'}.contains(value)) {
+        throw const FormatException('Unsupported library layout');
+      }
+      if (key == 'librarySort' &&
+          !{'added', 'title', 'recent', 'unread'}.contains(value)) {
+        throw const FormatException('Unsupported library sort');
       }
       if (key == 'interfaceFont' &&
           !{'Manrope', 'Newsreader', 'system'}.contains(value)) {

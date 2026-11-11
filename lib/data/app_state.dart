@@ -48,7 +48,9 @@ class AppState extends ChangeNotifier {
   StreamSubscription<List<LibraryEntry>>? _librarySubscription;
   Map<String, Json> chapterStats = {};
   StreamSubscription<Map<String, Json>>? _chapterSubscription;
-  bool syncing = false;
+  bool syncing = false, sourcesLoading = false;
+  bool _disposed = false;
+  Future<void>? _sourceRefresh;
   Object? syncError;
   Appearance appearance;
   AppState(
@@ -94,13 +96,9 @@ class AppState extends ChangeNotifier {
     });
     await loadRepositories();
     if (engine.available) {
-      try {
-        await refreshSources();
-      } catch (error) {
-        sourceErrors = [
-          {'message': '$error'},
-        ];
-      }
+      // Source startup can involve third-party class loading. It must never
+      // hold the first Flutter frame or block access to the local library.
+      unawaited(refreshSources().catchError((Object _) {}));
     }
   }
 
@@ -120,6 +118,15 @@ class AppState extends ChangeNotifier {
     await loadRepositories();
     notifyListeners();
     if (enableRepository) await syncRepositories();
+  }
+
+  void refreshAppearance() {
+    appearance =
+        Appearance.values[(preferences.getInt('appearance') ?? 0).clamp(
+          0,
+          Appearance.values.length - 1,
+        )];
+    notifyListeners();
   }
 
   Future<void> setAppearance(Appearance value) async {
@@ -210,16 +217,34 @@ class AppState extends ChangeNotifier {
     await loadRepositories();
   }
 
-  Future<void> refreshSources() async {
-    final result = await engine.sources();
-    sources = (result['sources'] as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    sourceErrors = (result['errors'] as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    installed = Map<String, dynamic>.from(result['installed']);
+  Future<void> refreshSources() => _sourceRefresh ??= _loadSources()
+      .whenComplete(() => _sourceRefresh = null);
+
+  Future<void> _loadSources() async {
+    if (_disposed) return;
+    sourcesLoading = true;
     notifyListeners();
+    try {
+      final result = await engine.sources();
+      if (_disposed) return;
+      sources = (result['sources'] as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      sourceErrors = (result['errors'] as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      installed = Map<String, dynamic>.from(result['installed']);
+    } catch (error) {
+      if (!_disposed) {
+        sourceErrors = [
+          {'message': '$error'},
+        ];
+      }
+      rethrow;
+    } finally {
+      sourcesLoading = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> install(ExtensionEntry entry) async {
@@ -237,6 +262,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _librarySubscription?.cancel();
     _chapterSubscription?.cancel();
     db.close();

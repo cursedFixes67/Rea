@@ -72,6 +72,12 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     if (project.hasProperty("dreamReleaseTest")) {
         implementation(project(":integration_test"))
+        // Align Flutter's older test transitive dependencies with the test APK.
+        // AGP resolves instrumentation dependencies consistently with this app.
+        constraints {
+            implementation("androidx.test:runner:1.7.0")
+            implementation("androidx.test:rules:1.7.0")
+        }
     }
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test:rules:1.7.0")

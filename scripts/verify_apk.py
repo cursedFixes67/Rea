@@ -3,7 +3,6 @@
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -23,9 +22,9 @@ with zipfile.ZipFile(args.apk) as archive:
     libraries = [name for name in archive.namelist() if name.startswith('lib/') and name.endswith('.so')]
     if not libraries or any(name.split('/')[1] != 'arm64-v8a' for name in libraries):
         raise SystemExit('APK must contain ARM64 native libraries only')
-    for required in ('lib/arm64-v8a/libapp.so', 'lib/arm64-v8a/libflutter.so'):
+    for required in ('lib/arm64-v8a/libapp.so', 'lib/arm64-v8a/libflutter.so', 'lib/arm64-v8a/libquickjs.so'):
         if required not in libraries:
-            raise SystemExit(f'Missing Flutter release library: {required}')
+            raise SystemExit(f'Missing release runtime library: {required}')
     for name in libraries:
         data = archive.read(name)
         if data[:6] != b'\x7fELF\x02\x01' or struct.unpack_from('<H', data, 18)[0] != 183:
@@ -36,6 +35,9 @@ with zipfile.ZipFile(args.apk) as archive:
             entry = struct.unpack_from('<IIQQQQQQ', data, offset + index * entry_size)
             if entry[0] == 1 and (entry[7] < 16384 or entry[2] % 16384 != entry[3] % 16384):
                 raise SystemExit(f'ELF load segment is not 16KB compatible: {name}')
+    for name in archive.namelist():
+        if re.fullmatch(r'classes\d*\.dex', name) and b'plugins.flutter.io/integration_test' in archive.read(name):
+            raise SystemExit('Flutter integration-test channel found in production DEX')
     if 'assets/flutter_assets/kernel_blob.bin' in archive.namelist():
         raise SystemExit('Debug Dart kernel found in release artifact')
 badging = subprocess.check_output([str(args.build_tools / 'aapt'), 'dump', 'badging', str(args.apk)], text=True)
@@ -52,6 +54,6 @@ print(f'Verified {symbols} current Atsumaru/Kagane referenced symbols')
 checksum = hashlib.sha256(args.apk.read_bytes()).hexdigest()
 (args.apk.parent / 'SHA256SUMS').write_text(f'{checksum}  {args.apk.name}\n')
 version = re.search(r"versionName='([^']+)'", badging).group(1)
-metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceCommit': os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments', 'Injekt generic type signatures', 'Atsumaru/Kagane static class and member linkage'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
+metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'versionCode': int(re.search(r"versionCode='(\d+)'", badging).group(1)), 'minimumAndroidApi': int(re.search(r"sdkVersion:'(\d+)'", badging).group(1)), 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceTreeDirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()), 'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'no integration-test channel', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments', 'Injekt generic type signatures', 'Atsumaru/Kagane static class and member linkage'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
 (args.apk.parent / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
 print(f'Verified {args.apk.name}: {checksum}')

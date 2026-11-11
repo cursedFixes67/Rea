@@ -328,8 +328,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Restore preview'),
-        content: Text(
-          '${payload['importNotes'] ?? ''}\n\n${(payload['library'] as List).length} library entries\n${(payload['chapters'] as List).length} chapter records\n${(payload['repositories'] as List).length} repositories\n\nExisting library and chapter records are preserved. New entries are merged. Extension APKs must be installed again. Downloaded image files are not included; download those chapters again. Existing settings are preserved. Imported repositories are disabled until you review and enable them.',
+        content: SingleChildScrollView(
+          child: Text(
+            '${payload['importNotes'] ?? ''}\n\n${(payload['library'] as List).length} library entries\n${(payload['chapters'] as List).length} chapter records\n${(payload['repositories'] as List).length} repositories\n\nExisting library and chapter records are preserved. New entries are merged. Extension APKs must be installed again. Downloaded image files are not included; download those chapters again. Existing settings are preserved. Imported repositories are disabled until you review and enable them.',
+          ),
         ),
         actions: [
           TextButton(
@@ -386,6 +388,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
     await widget.state.loadRepositories();
+    widget.state.refreshAppearance();
+    if (widget.state.engine.available) {
+      await widget.state.engine.call('downloadConfigure');
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Backup merged successfully')),
