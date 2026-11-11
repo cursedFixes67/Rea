@@ -20,7 +20,7 @@ class ExtensionService : Service() {
                 }
                 bundle.putString("result", result.toString())
             } catch (error: Throwable) {
-                bundle.putString("error", "${error.javaClass.simpleName}: ${error.message ?: "Source operation failed"}")
+                bundle.putString("error", SourceErrors.describe(error))
             }
             try { reply.send(Message.obtain().apply { arg1 = requestId; data = bundle }) } catch (_: RemoteException) { }
         }
@@ -28,4 +28,12 @@ class ExtensionService : Service() {
     })
     override fun onBind(intent: Intent): IBinder = messenger.binder
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
+}
+
+object SourceErrors {
+    fun describe(error: Throwable): String {
+        var cause = error
+        repeat(8) { cause = cause.cause?.takeUnless { it === cause } ?: return "${cause.javaClass.simpleName}: ${cause.message ?: "Source operation failed"}".take(2000) }
+        return "${cause.javaClass.simpleName}: ${cause.message ?: "Source operation failed"}".take(2000)
+    }
 }

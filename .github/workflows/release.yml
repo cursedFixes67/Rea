@@ -29,7 +29,7 @@ jobs:
           git -C "$RUNNER_TEMP/flutter" fetch --depth 1 origin c197ca5199e9ee5661e865596c9c07294dfab51c
           git -C "$RUNNER_TEMP/flutter" checkout FETCH_HEAD
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
-          sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-37.0' 'build-tools;36.0.0'
       - name: Materialize private signing configuration
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

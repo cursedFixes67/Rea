@@ -37,6 +37,7 @@ class ExtensionRuntime private constructor(private val context: Context) {
     private val sources = linkedMapOf<String, Source>()
     private val sourcePackages = mutableMapOf<String, String>()
     private val mutex = Mutex()
+    private val imageLocks = Array(64) { Mutex() }
     private var loaded = false
     private var errors = JSONArray()
     init {
@@ -107,13 +108,19 @@ class ExtensionRuntime private constructor(private val context: Context) {
                     sources[id] = source; sourcePackages[id] = pkg
                 }
             } catch (error: Throwable) {
-                errors.put(JSONObject().put("packageName", pkg).put("message", error.message ?: error.javaClass.simpleName))
+                errors.put(JSONObject().put("packageName", pkg).put("message", SourceErrors.describe(error)))
             }
         }
         loaded = true
     }
-    suspend fun execute(method: String, args: JSONObject): Any = mutex.withLock {
-        withContext(Dispatchers.IO) {
+    suspend fun execute(method: String, args: JSONObject): Any {
+        if (method == "image") return withContext(Dispatchers.IO) {
+            val source = mutex.withLock { ensureLoaded(); sources[args.getString("sourceId")] ?: error("Source is not loaded") }
+            val page = args.getJSONObject("page")
+            val key = "${source.id}:${page.getString("url")}".hashCode() and 63
+            imageLocks[key].withLock { image(source, page) }
+        }
+        return mutex.withLock { withContext(Dispatchers.IO) {
             when (method) {
                 "install" -> install(args)
                 "uninstall" -> {
@@ -165,6 +172,7 @@ class ExtensionRuntime private constructor(private val context: Context) {
             }
         }
     }
+    }
     private suspend fun image(source: Source, json: JSONObject): JSONObject {
         val cache = File(context.cacheDir, "reader_images").apply { mkdirs() }
         val url = json.getString("url")
@@ -215,7 +223,7 @@ class ExtensionRuntime private constructor(private val context: Context) {
         val stage = File.createTempFile("extension-", ".apk", directory)
         val backup = File(directory, "$pkg.previous")
         try {
-            network.client.newCall(Request.Builder().url(url).build()).execute().use { response ->
+            network.client.newBuilder().followSslRedirects(false).build().newCall(Request.Builder().url(url).build()).execute().use { response ->
                 check(response.isSuccessful) { "Extension download failed: HTTP ${response.code}" }
                 response.body.byteStream().use { input -> stage.outputStream().use { output ->
                     val buffer = ByteArray(32768); var total = 0L

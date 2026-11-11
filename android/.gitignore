@@ -11,3 +11,5 @@ key.properties
 **/*.jks
 
 /build/
+
+.kotlin/

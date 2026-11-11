@@ -27,6 +27,7 @@ class DownloadController(private val context: Context) {
     private val root = File(context.filesDir, "downloads").apply { mkdirs() }
     fun id(key: String) = MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString("") { "%02x".format(it) }
     fun enqueue(job: JSONObject): JSONObject {
+        require(job.getJSONArray("pages").length() > 0) { "This chapter contains no downloadable pages" }
         val id = id(job.getString("key")); val directory = File(root, id).apply { mkdirs() }
         val file = File(directory, "job.json")
         if (!file.exists()) file.writeText(job.toString())
