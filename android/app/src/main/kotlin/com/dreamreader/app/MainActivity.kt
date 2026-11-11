@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
     private var directoryResult: MethodChannel.Result? = null
     private var captureVolume = false
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val imageRequests = CancellableRequests(activityScope)
     private val receiver = Messenger(Handler(Looper.getMainLooper()) { message ->
         val reply = message.data
         val request = pending.remove(message.arg1)
@@ -91,16 +92,33 @@ class MainActivity : FlutterActivity() {
                     } catch (error: Exception) { result.error("DOWNLOAD_ERROR", error.message, null) }
                 }
 
-                "readerImageInfo", "readerImageRegion" -> activityScope.launch {
+                "readerCancelRegion" -> {
+                    call.argument<Int>("requestId")?.let(imageRequests::cancel)
+                    result.success(null)
+                }
+                "readerImageInfo" -> activityScope.launch {
                     try {
-                        val value = withContext(Dispatchers.IO) {
-                            val regions = ImageRegions(applicationContext)
-                            val path = requireNotNull(call.argument<String>("path"))
-                            if (call.method == "readerImageInfo") regions.info(path)
-                            else regions.decode(path, requireNotNull(call.argument<Int>("index")))
-                        }
-                        result.success(value)
+                        result.success(withContext(Dispatchers.IO) {
+                            ImageRegions(applicationContext).info(requireNotNull(call.argument<String>("path")))
+                        })
                     } catch (error: Exception) { result.error("IMAGE_ERROR", error.message, null) }
+                }
+                "readerImageRegion" -> {
+                    val id = call.argument<Int>("requestId")
+                    if (id == null) result.error("IMAGE_ERROR", "Missing image request identity", null)
+                    else imageRequests.launch(id, onCancelled = {
+                        handler.post { if (!isDestroyed) result.error("IMAGE_CANCELLED", "Image region is no longer visible", null) }
+                    }) {
+                        try {
+                            val value = withContext(Dispatchers.IO) {
+                                ImageRegions(applicationContext).decode(
+                                    requireNotNull(call.argument<String>("path")),
+                                    requireNotNull(call.argument<Int>("index")))
+                            }
+                            result.success(value)
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (error: Exception) { result.error("IMAGE_ERROR", error.message, null) }
+                    }
                 }
 
                 "readerSettings" -> {
@@ -111,14 +129,18 @@ class MainActivity : FlutterActivity() {
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     result.success(null)
                 }
-                "openWebsite" -> { startActivity(Intent(this, SourceWebActivity::class.java).putExtra("sourceId", call.argument<String>("sourceId"))); result.success(null) }
+                "openWebsite" -> { startActivity(sourceIntent(SourceWebActivity::class.java, call.argument<String>("sourceId"))); result.success(null) }
                 "preferences" -> {
-                    startActivity(Intent(this, SourcePreferencesActivity::class.java).putExtra("sourceId", call.argument<String>("sourceId")))
+                    startActivity(sourceIntent(SourcePreferencesActivity::class.java, call.argument<String>("sourceId")))
                     result.success(null)
                 }
                 else -> dispatch(call.method, call.arguments as? Map<*, *> ?: emptyMap<Any, Any>(), result)
             }
         }
+    }
+    private fun sourceIntent(activity: Class<out android.app.Activity>, sourceId: String?): Intent {
+        val appearance = (getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE).all["flutter.appearance"] as? Number)?.toInt()
+        return Intent(this, activity).putExtra("sourceId", sourceId).putExtra("dreamLight", appearance == 3)
     }
     private fun dispatch(method: String, args: Map<*, *>, result: MethodChannel.Result, attempts: Int = 0) {
         val target = service

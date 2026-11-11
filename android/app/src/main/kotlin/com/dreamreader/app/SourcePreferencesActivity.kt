@@ -1,14 +1,30 @@
 package com.dreamreader.app
 import android.os.Bundle
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import android.widget.LinearLayout
+import android.widget.FrameLayout
+import android.view.ViewGroup
 import androidx.preference.PreferenceFragmentCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
 
-class SourcePreferencesActivity : FragmentActivity() {
+class SourcePreferencesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        SourceChrome.theme(this)
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) supportFragmentManager.beginTransaction().replace(android.R.id.content,
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(Toolbar(this).apply {
+            title = "Source preferences"
+            setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+            navigationContentDescription = "Back"
+            setNavigationOnClickListener { finish() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, SourceChrome.dp(this, 56)))
+        root.addView(FrameLayout(this).apply { id = R.id.source_preferences_content },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        setContentView(root)
+        SourceChrome.insets(this, root)
+        if (savedInstanceState == null) supportFragmentManager.beginTransaction().replace(R.id.source_preferences_content,
             SourcePreferencesFragment().apply { arguments = Bundle().apply { putString("sourceId", intent.getStringExtra("sourceId")) } }).commit()
     }
 }

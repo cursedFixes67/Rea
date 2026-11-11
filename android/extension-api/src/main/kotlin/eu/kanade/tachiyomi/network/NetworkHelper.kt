@@ -13,7 +13,8 @@ import java.util.concurrent.TimeUnit
 
 class NetworkHelper(context: Context) {
     val cookieJar = AndroidCookieJar()
-    val defaultUserAgentProvider: () -> String = { "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36" }
+    val defaultUserAgentProvider: () -> String = { // Matches NetworkPreferences in the pinned Mihon reference. WebView uses this too.
+        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36" }
     fun defaultUserAgentProvider(): String = defaultUserAgentProvider.invoke()
     val client: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(cookieJar)

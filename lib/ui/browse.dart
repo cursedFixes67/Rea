@@ -211,6 +211,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         onChanged: (v) => setState(() => language = v!),
                       ),
                       FilterChip(
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                         label: const Text('Adult sources'),
                         selected: mature,
                         onSelected: (v) => setState(() => mature = v),

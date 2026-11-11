@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -212,12 +213,15 @@ class _ImageRegion extends StatefulWidget {
 }
 
 class _ImageRegionState extends State<_ImageRegion> {
+  static int nextRequest = 0;
+  final requestId = ++nextRequest;
   MemoryImage? provider;
   late Future<MemoryImage> image = _load();
   Future<MemoryImage> _load() async {
     final bytes = await widget.engine.call('readerImageRegion', {
       'path': widget.path,
       'index': widget.index,
+      'requestId': requestId,
     }) as Uint8List;
     final result = MemoryImage(bytes);
     if (mounted) provider = result;
@@ -228,6 +232,12 @@ class _ImageRegionState extends State<_ImageRegion> {
   void dispose() {
     // ImageCache otherwise retains every strip visited in a long chapter.
     provider?.evict();
+    // Drop queued native decoding when this region scrolls out of the viewport.
+    unawaited(
+      widget.engine
+          .call('readerCancelRegion', {'requestId': requestId})
+          .then<void>((_) {}, onError: (Object _, StackTrace _) {}),
+    );
     super.dispose();
   }
 
