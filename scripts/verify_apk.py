@@ -35,9 +35,14 @@ with zipfile.ZipFile(args.apk) as archive:
             entry = struct.unpack_from('<IIQQQQQQ', data, offset + index * entry_size)
             if entry[0] == 1 and (entry[7] < 16384 or entry[2] % 16384 != entry[3] % 16384):
                 raise SystemExit(f'ELF load segment is not 16KB compatible: {name}')
-    for name in archive.namelist():
-        if re.fullmatch(r'classes\d*\.dex', name) and b'plugins.flutter.io/integration_test' in archive.read(name):
-            raise SystemExit('Flutter integration-test channel found in production DEX')
+    dex_files = [archive.read(name) for name in archive.namelist() if re.fullmatch(r'classes\d*\.dex', name)]
+    if any(b'plugins.flutter.io/integration_test' in dex for dex in dex_files):
+        raise SystemExit('Flutter integration-test channel found in production DEX')
+    native_code = b''.join(dex_files)
+    dart_code = archive.read('lib/arm64-v8a/libapp.so')
+    for channel in ('readerImageInfo', 'readerImageRegion', 'readerCancelRegion'):
+        if channel.encode() not in native_code or channel.encode() not in dart_code:
+            raise SystemExit(f'Reader channel missing from release Dart/native code: {channel}')
     if 'assets/flutter_assets/kernel_blob.bin' in archive.namelist():
         raise SystemExit('Debug Dart kernel found in release artifact')
 badging = subprocess.check_output([str(args.build_tools / 'aapt'), 'dump', 'badging', str(args.apk)], text=True)
@@ -54,6 +59,6 @@ print(f'Verified {symbols} current Atsumaru/Kagane referenced symbols')
 checksum = hashlib.sha256(args.apk.read_bytes()).hexdigest()
 (args.apk.parent / 'SHA256SUMS').write_text(f'{checksum}  {args.apk.name}\n')
 version = re.search(r"versionName='([^']+)'", badging).group(1)
-metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'versionCode': int(re.search(r"versionCode='(\d+)'", badging).group(1)), 'minimumAndroidApi': int(re.search(r"sdkVersion:'(\d+)'", badging).group(1)), 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceTreeDirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()), 'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'no integration-test channel', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments', 'Injekt generic type signatures', 'Atsumaru/Kagane static class and member linkage'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
+metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'versionCode': int(re.search(r"versionCode='(\d+)'", badging).group(1)), 'minimumAndroidApi': int(re.search(r"sdkVersion:'(\d+)'", badging).group(1)), 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceTreeDirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()), 'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'no integration-test channel', 'reader channel symbols in Dart/native code', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments', 'Injekt generic type signatures', 'Atsumaru/Kagane static class and member linkage'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
 (args.apk.parent / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
 print(f'Verified {args.apk.name}: {checksum}')

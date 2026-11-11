@@ -1,10 +1,10 @@
 <!-- coderabbit-ai-generated:v1 -->
 
-<!-- coderabbit-ai-generated-section:v1:0411c32443d8f56de211b218f5dd69bdfc2d6bf5ed9c01fbafdd4c803b96fcd4 -->
+<!-- coderabbit-ai-generated-section:v1:de00d9b7e36096f53ba06954df51f492bfa1da77c5df04f929e735f2a930f69b -->
 
 # Verification status
 
-## Version 2 development checkpoints
+## Version 2 release checks
 
 Version 2.0.0 uses package `com.dreamreader.app`, Android version code 2, minimum API 26 and ARM64 only. It retains version 1's production signing certificate:
 
@@ -12,15 +12,15 @@ Version 2.0.0 uses package `com.dreamreader.app`, Android version code 2, minimu
 881f2a3fa91f54dd556728334c9c598a31ddb2cdfe44e956a2618d255ebdfa4b
 ```
 
-The signed checkpoint containing the native QuickJS adapter passed ZIP CRC, release/non-debuggable checks, package/ABI checks, Android signature verification and 16 KB ZIP/ELF alignment. Its APK SHA-256 was `36d892cb19f1494295336bfedb383576d3392e3441bddb96b896df895572f735`. This is a development checkpoint; final release assets identify the published binary.
+Signed V2 candidates passed ZIP CRC, release/non-debuggable checks, package/ABI checks, Android signature verification and 16 KB ZIP/ELF alignment. The release asset `build-info.json` records the published binary's source commit, SHA-256 and size; `SHA256SUMS` independently identifies the APK. Reader region-channel names are checked in both compiled Dart and native DEX. These are binary-presence checks, not device execution.
 
 The release DEX checks passed 60 Injekt generic type tokens and 1,030 actual host class/member references from Atsumaru 1.6.26 and Kagane 1.6.42. Negative checks rejected version 1's stripped type metadata, an earlier V2 checkpoint's missing Zstandard APIs, and an actual test-enabled APK containing Flutter's integration-test channel.
 
 ## Host and browser coverage
 
-- Flutter analysis passed. The 48-case full suite passed before the latest search/cover-transition refinements; fresh coverage is recorded with the final release.
+- Flutter analysis and all 52 Flutter tests passed, including source-search request ordering, offline reading, image failure/progress, viewport cancellation and populated large-text navigation.
 - Six Python artifact-parser tests passed, including real DEX fixtures and inheritance/overload boundaries.
-- Eighteen Android JVM tests passed: payload-file boundaries, adjustable download concurrency, image-region geometry, extension lifecycle locking and atomic source registration.
+- Twenty-one Android JVM tests passed: payload-file boundaries, adjustable download concurrency, image-region geometry, queued decode cancellation, extension lifecycle locking and atomic source registration.
 - Android acceptance test sources and APK compiled successfully after aligning Flutter's older transitive test dependencies. No instrumentation execution is claimed.
 - The pinned QuickJS JNI sources passed a Linux host harness for primitive values, errors, 24 concurrent independent evaluations and context reset. This is not an Android binary execution.
 - SQLite scale fixture: 3,000 titles and 30,000 chapters, correct indexed/paginated results. Observed host queries were approximately 14 ms for the first 201 update rows and 100 ms for library/aggregate retrieval; these are not phone frame-rate measurements.
@@ -37,6 +37,5 @@ Tracker sign-in requires registered public AniList/MyAnimeList client IDs and ha
 ## Import boundaries
 
 Mihon imports cover saved titles, source IDs, metadata, chapters, read state, page positions, bookmarks, categories and history. Multiple categories become a combined category. Tracker sessions, credentials, extension APKs and source preferences are excluded. Existing Dream Reader records are preserved. Backup download inventory contains metadata, not downloaded image files.
-
 
 <!-- /coderabbit-ai-generated:v1 -->

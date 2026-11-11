@@ -1,6 +1,6 @@
 <!-- coderabbit-ai-generated:v1 -->
 
-<!-- coderabbit-ai-generated-section:v1:2fd76acce8685443b0404c11d8d1248f5953bd274078254bbc36dce45d2dabff -->
+<!-- coderabbit-ai-generated-section:v1:feb89659de10119af37110c38194c45e1adb2f0436482665aaece37e1ae93057 -->
 
 # Dream Reader architecture
 
@@ -27,7 +27,7 @@ Installation requires explicit consent, HTTPS, cryptographic APK verification, t
 
 A lifecycle gate permits concurrent source reads and gives installation/removal exclusive access. Each source's ordinary requests remain sequential; different sources can progress independently. Image requests use separate locks. Long metadata and source-preference lookup stays off the UI thread.
 
-The adapter exports pinned Mihon source interfaces and host dependencies. Injekt generic type metadata and dynamically linked APIs are preserved through R8. JavaScript uses Mihon's pinned QuickJS binding `547f5b1597e7f18984b1bdbee1ca5984b2175fa4`, with one interpreter per evaluation and native primitive results. HTTP image calls use the source's client and interceptors. Interactive website verification uses a cookie-sharing WebView.
+The adapter exports pinned Mihon source interfaces and host dependencies. Injekt generic type metadata and dynamically linked APIs are preserved through R8. JavaScript uses Mihon's pinned QuickJS binding `547f5b1597e7f18984b1bdbee1ca5984b2175fa4`, with one interpreter per evaluation and native primitive results. HTTP image calls use the source's client and interceptors. Interactive website verification uses a cookie-sharing WebView. Native website and preference screens follow the selected light/dark appearance, system insets and accessible toolbar controls.
 
 **The extension process shares the app UID and is not a security sandbox.** Installed code can access application storage and the network. IPC deadlines bound the caller's wait; coroutine cancellation cannot forcibly interrupt arbitrary native JavaScript or uncooperative extension code. Process separation helps ordinary crash recovery but does not establish security isolation.
 
@@ -35,7 +35,7 @@ The adapter exports pinned Mihon source interfaces and host dependencies. Injekt
 
 Continuous and paged readers preserve chapter/page progress, bookmarks and preferences. A page is marked decoded only after an image frame is available; a failed final image does not complete a chapter. Complete downloads are read without contacting the source. Stale prefetch results cannot replace a newer chapter's state.
 
-Tall Android images use BitmapRegionDecoder where supported. Regions are bounded to 1800×2048 decoded pixels, with two native decodes at a time. Flutter mounts visible regions and neighbours, then evicts their decoded image cache entries. Unsupported codecs use a bounded whole-image fallback. Actual codec support depends on Android; geometry and viewport tests do not establish device decoder behavior.
+Tall Android images use BitmapRegionDecoder where supported. Regions are bounded to 1800×2048 decoded pixels, with two native decodes at a time. Flutter mounts visible regions and neighbours, then evicts their decoded image cache entries. Leaving the viewport cancels queued native region work; cancellation identities prevent old jobs from removing newer requests. Unsupported codecs use a bounded whole-image fallback. Actual codec support depends on Android; geometry and viewport tests do not establish device decoder behavior.
 
 WorkManager owns chapter downloads. A configurable 1–6 slot limit and per-chapter locks coordinate workers, pause/resume and deletion. Finished pages are reused, metadata is replaced atomically, and damaged metadata is isolated as a deletable entry. Polling runs only while Downloads is active in the foreground. Images remain private application files.
 
@@ -48,6 +48,5 @@ Mihon protobuf imports cover titles, source IDs, metadata, chapters, read state,
 ## Verification boundaries
 
 Release checks inspect the actual APK's signature, manifest, architecture, 16 KB ZIP/ELF alignment, Injekt generic signatures and 1,030 class/member references from Atsumaru 1.6.26 and Kagane 1.6.42. These checks detect the observed release defects; they do not prove every extension's runtime behavior. Device acceptance remains with the owner, as requested. See [verification](verification.md).
-
 
 <!-- /coderabbit-ai-generated:v1 -->

@@ -67,12 +67,12 @@ class MainActivity : FlutterActivity() {
                 "backupConfigure", "backupStatus", "backupNow" -> activityScope.launch {
                     try {
                         val value = withContext(Dispatchers.IO) {
-                            when (call.method) {
+                            decode(when (call.method) {
                                 "backupConfigure" -> BackupSchedule.configure(applicationContext, JSONObject(call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()))
                                 "backupNow" -> { androidx.work.WorkManager.getInstance(applicationContext).enqueueUniqueWork("dream-manual-backup", androidx.work.ExistingWorkPolicy.KEEP, androidx.work.OneTimeWorkRequestBuilder<BackupWorker>().build()); BackupSchedule.status(applicationContext) }
                                 else -> BackupSchedule.status(applicationContext)
-                            }
-                        }; result.success(decode(value))
+                            })
+                        }; result.success(value)
                     } catch (error: Exception) { result.error("BACKUP_ERROR", error.message, null) }
                 }
                 "downloadEnqueue", "downloadControl", "downloadList", "downloadPages", "downloadConfigure" -> activityScope.launch {
@@ -80,15 +80,15 @@ class MainActivity : FlutterActivity() {
                         val value = withContext(Dispatchers.IO) {
                             val controller = DownloadController(applicationContext)
                             val args = JSONObject(call.arguments as? Map<*, *> ?: emptyMap<Any, Any>())
-                            when (call.method) {
+                            decode(when (call.method) {
                                 "downloadEnqueue" -> controller.enqueue(args)
                                 "downloadConfigure" -> controller.configure()
                                 "downloadControl" -> controller.control(args)
                                 "downloadPages" -> controller.pages(args.getString("key"))
                                 else -> controller.list()
-                            }
+                            })
                         }
-                        result.success(decode(value))
+                        result.success(value)
                     } catch (error: Exception) { result.error("DOWNLOAD_ERROR", error.message, null) }
                 }
 
