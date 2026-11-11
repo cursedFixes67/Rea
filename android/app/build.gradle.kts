@@ -15,6 +15,7 @@ if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = tr
 
 android {
     namespace = "com.dreamreader.app"
+    testBuildType = if (project.hasProperty("dreamReleaseTest")) "release" else "debug"
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
@@ -25,6 +26,7 @@ android {
 
     defaultConfig {
         applicationId = "com.dreamreader.app"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -64,6 +66,8 @@ flutter {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test:rules:1.7.0")
     implementation(project(":extension-api"))
     implementation("com.android.tools.build:apksig:9.5.1")
     implementation("androidx.fragment:fragment-ktx:1.8.9")

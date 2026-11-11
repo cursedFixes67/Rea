@@ -63,8 +63,7 @@ jobs:
         env:
           DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
         run: |
-          flutter build apk --release --target-platform android-x64 -t integration_test/source_journey_test.dart
-          flutter drive --release -d emulator-5554 --driver test_driver/integration_test.dart --target integration_test/source_journey_test.dart --use-application-binary build/app/outputs/flutter-apk/app-release.apk
+          ./android/gradlew -p android app:connectedReleaseAndroidTest -PdreamReleaseTest=true -Ptarget="$PWD/integration_test/source_journey_test.dart" -Ptarget-platform=android-x64 --console=plain
       - name: Install and launch ARM64 artifact
         run: |
           "$ANDROID_HOME/platform-tools/adb" install -r build/release/DreamReader-arm64-release.apk
@@ -84,6 +83,8 @@ jobs:
             ${{ runner.temp }}/emulator.log
             ${{ runner.temp }}/app-crash.log
             ${{ runner.temp }}/arm64-launch.png
+            build/app/reports/androidTests/
+            build/app/outputs/androidTest-results/
           retention-days: 7
       - name: Label verification artifact
         run: mv build/release/DreamReader-arm64-release.apk build/release/DreamReader-arm64-ci-verification.apk
