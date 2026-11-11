@@ -49,16 +49,22 @@ jobs:
           password = (root / 'signing-password').read_text().strip()
           (root / 'signing.properties').write_text(f'storeFile={root}/ci.jks\nstorePassword={password}\nkeyAlias=ci\nkeyPassword={password}\n')
           PY
-      - name: Analyze, test, build and verify ARM64
-        env:
-          DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
-        run: scripts/build_release.sh
       - name: Prepare accelerated Android device
         run: |
           test -c /dev/kvm
           sudo chmod 666 /dev/kvm
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-35;google_apis;x86_64' 'emulator'
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name dream-ci --package 'system-images;android-35;google_apis;x86_64'
+          export ANDROID_USER_HOME="$RUNNER_TEMP/android-user"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_USER_HOME=$ANDROID_USER_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_EMULATOR_HOME=$ANDROID_EMULATOR_HOME" >> "$GITHUB_ENV"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name dream-ci --path "$ANDROID_AVD_HOME/dream-ci.avd" --package 'system-images;android-35;google_apis;x86_64'
+          test -f "$ANDROID_AVD_HOME/dream-ci.avd/config.ini"
+          printf 'avd.ini.encoding=UTF-8\npath=%s/dream-ci.avd\ntarget=android-35\n' "$ANDROID_AVD_HOME" > "$ANDROID_AVD_HOME/dream-ci.ini"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
           "$ANDROID_HOME/emulator/emulator" -avd dream-ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2048 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator_pid=$!
           ready=false
@@ -77,6 +83,10 @@ jobs:
           "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
           "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
           "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
+      - name: Analyze, test, build and verify ARM64
+        env:
+          DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
+        run: scripts/build_release.sh
       - name: Test real source journey in release mode
         env:
           DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
