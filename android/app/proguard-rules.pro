@@ -1,0 +1,12 @@
+# Extension DEX links to host API names and signatures at runtime.
+-keep class eu.kanade.tachiyomi.** { *; }
+-keep class uy.kohesive.injekt.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class org.jsoup.** { *; }
+-keep class kotlinx.serialization.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep class kotlin.** { *; }
+-keep class androidx.preference.** { *; }
+-keep class rx.** { *; }
+-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*

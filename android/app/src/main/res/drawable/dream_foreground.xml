@@ -1,0 +1,8 @@
+<!-- Dream Reader original vector artwork, generated with CodeRabbit. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#ACEBD5" android:pathData="M64,25 C48,20 32,32 32,49 C32,67 47,81 64,78 C51,74 44,65 44,52 C44,39 51,29 64,25 Z"/>
+    <path android:fillColor="#FFF0D9" android:pathData="M70,32 L72,39 L79,41 L72,43 L70,50 L68,43 L61,41 L68,39 Z"/>
+    <path android:fillColor="#ACEBD5" android:pathData="M55,58 Q64,54 75,57 L75,72 Q64,69 55,74 Z"/>
+    <path android:fillColor="#74BBA6" android:pathData="M55,58 Q48,54 40,57 L40,72 Q48,70 55,74 Z"/>
+    <path android:strokeColor="#0B1418" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M55,58 L55,73"/>
+</vector>
