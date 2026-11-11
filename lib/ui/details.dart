@@ -24,11 +24,83 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
   bool loading = true, reverse = false, unreadOnly = false;
   Object? error;
   String? downloading;
+  final Set<String> selected = {};
+  final Set<String> downloaded = {};
+  bool batchDownloading = false;
+  bool cancelBatch = false;
+  int batchDone = 0;
+  Future<void> _loadDownloads() async {
+    if (!widget.state.engine.available) return;
+    try {
+      final jobs = await widget.state.engine.call('downloadList') as List;
+      if (!mounted) return;
+      setState(() {
+        downloaded.clear();
+        downloaded.addAll(
+          jobs
+              .where(
+                (j) => j['mangaKey'] == manga.key && j['status'] == 'SUCCEEDED',
+              )
+              .map((j) => '${j['chapterUrl']}'),
+        );
+      });
+    } catch (_) {
+      /* Source refresh errors are shown independently. */
+    }
+  }
+
+  Future<void> _downloadSelected() async {
+    final queue = chapters.where((c) => selected.contains(c.url)).toList();
+    setState(() {
+      batchDownloading = true;
+      cancelBatch = false;
+      batchDone = 0;
+    });
+    final failures = <String>[];
+    for (final chapter in queue) {
+      if (!mounted || cancelBatch) break;
+      try {
+        await _enqueue(chapter);
+      } catch (e) {
+        failures.add('${chapter.name}: $e');
+      }
+      if (mounted) setState(() => batchDone++);
+    }
+    if (!mounted) return;
+    setState(() {
+      batchDownloading = false;
+      selected.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failures.isEmpty
+              ? '$batchDone chapters added to downloads'
+              : '${batchDone - failures.length} queued; ${failures.length} failed. ${failures.first}',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _enqueue(Chapter chapter) async {
+    final pages = await widget.state.engine.pages(manga, chapter);
+    await widget.state.engine.call('downloadEnqueue', {
+      'key': '${manga.key}::${chapter.url}',
+      'mangaKey': manga.key,
+      'chapterUrl': chapter.url,
+      'title': manga.title,
+      'chapterName': chapter.name,
+      'wifiOnly': widget.state.preferences.getBool('wifiOnly') ?? true,
+      'pages': pages.map((p) => p.toJson()).toList(),
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     manga = widget.initial;
     _load();
+    _loadDownloads();
   }
 
   Future<void> _load() async {
@@ -68,21 +140,13 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
     );
     progress = await widget.state.db.chapters(manga.key);
     if (mounted) setState(() {});
+    await _loadDownloads();
   }
 
   Future<void> _download(Chapter chapter) async {
     setState(() => downloading = chapter.url);
     try {
-      final pages = await widget.state.engine.pages(manga, chapter);
-      await widget.state.engine.call('downloadEnqueue', {
-        'key': '${manga.key}::${chapter.url}',
-        'mangaKey': manga.key,
-        'chapterUrl': chapter.url,
-        'title': manga.title,
-        'chapterName': chapter.name,
-        'wifiOnly': widget.state.preferences.getBool('wifiOnly') ?? true,
-        'pages': pages.map((p) => p.toJson()).toList(),
-      });
+      await _enqueue(chapter);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${chapter.name} added to downloads')),
@@ -297,6 +361,35 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                     'Chapters',
                     trailing: Row(
                       children: [
+                        PopupMenuButton<String>(
+                          tooltip: 'Select chapters',
+                          enabled: !batchDownloading && chapters.isNotEmpty,
+                          onSelected: (choice) => setState(() {
+                            selected.clear();
+                            selected.addAll(
+                              visible
+                                  .where(
+                                    (c) =>
+                                        choice == 'all' ||
+                                        !progress.any(
+                                          (p) => p.url == c.url && p.completed,
+                                        ),
+                                  )
+                                  .map((c) => c.url),
+                            );
+                          }),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'unread',
+                              child: Text('Select unread'),
+                            ),
+                            PopupMenuItem(
+                              value: 'all',
+                              child: Text('Select visible chapters'),
+                            ),
+                          ],
+                          icon: const Icon(Icons.checklist),
+                        ),
                         IconButton(
                           tooltip: 'Unread chapters only',
                           onPressed: () =>
@@ -315,7 +408,42 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                       ],
                     ),
                   ),
-                  if (loading) const LinearProgressIndicator(),
+                  if (selected.isNotEmpty || batchDownloading)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                batchDownloading
+                                    ? 'Preparing $batchDone / ${selected.length}'
+                                    : '${selected.length} selected',
+                              ),
+                            ),
+                            if (!batchDownloading)
+                              IconButton(
+                                tooltip: 'Clear selection',
+                                onPressed: () => setState(selected.clear),
+                                icon: const Icon(Icons.close),
+                              ),
+                            FilledButton.icon(
+                              onPressed: batchDownloading
+                                  ? () => setState(() => cancelBatch = true)
+                                  : _downloadSelected,
+                              icon: Icon(
+                                batchDownloading ? Icons.stop : Icons.download,
+                              ),
+                              label: Text(
+                                batchDownloading ? 'Stop' : 'Download',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (loading || batchDownloading)
+                    const LinearProgressIndicator(),
                 ],
               ),
             ),
@@ -339,15 +467,36 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                   horizontal: 24,
                   vertical: 4,
                 ),
-                leading: Icon(
-                  record?.completed == true
-                      ? Icons.check_circle_outline
-                      : Icons.menu_book_outlined,
-                  color: record?.completed == true
-                      ? dreamMuted
-                      : widget.state.accent,
-                  size: 20,
-                ),
+                selected: selected.contains(c.url),
+                onLongPress: batchDownloading
+                    ? null
+                    : () => setState(() {
+                        if (!selected.add(c.url)) selected.remove(c.url);
+                      }),
+                leading: selected.isNotEmpty
+                    ? Checkbox(
+                        value: selected.contains(c.url),
+                        onChanged: batchDownloading
+                            ? null
+                            : (value) => setState(() {
+                                if (value == true) {
+                                  selected.add(c.url);
+                                } else {
+                                  selected.remove(c.url);
+                                }
+                              }),
+                      )
+                    : Icon(
+                        downloaded.contains(c.url)
+                            ? Icons.offline_pin_outlined
+                            : record?.completed == true
+                            ? Icons.check_circle_outline
+                            : Icons.menu_book_outlined,
+                        color: record?.completed == true
+                            ? dreamMuted
+                            : widget.state.accent,
+                        size: 20,
+                      ),
                 title: Text(
                   c.name,
                   style: TextStyle(
@@ -368,13 +517,24 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : IconButton(
-                        tooltip: 'Download chapter',
-                        onPressed: downloading == null
+                        tooltip: downloaded.contains(c.url)
+                            ? 'Downloaded'
+                            : 'Download chapter',
+                        onPressed:
+                            downloading == null &&
+                                !batchDownloading &&
+                                !downloaded.contains(c.url)
                             ? () => _download(c)
                             : null,
                         icon: const Icon(Icons.download_outlined, size: 20),
                       ),
-                onTap: () => _read(c),
+                onTap: selected.isEmpty
+                    ? () => _read(c)
+                    : batchDownloading
+                    ? null
+                    : () => setState(() {
+                        if (!selected.add(c.url)) selected.remove(c.url);
+                      }),
               );
             },
           ),

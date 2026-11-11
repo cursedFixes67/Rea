@@ -28,7 +28,8 @@ jobs:
           git -C "$RUNNER_TEMP/flutter" checkout FETCH_HEAD
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - name: Prepare Android SDK
-        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-37.0' 'build-tools;36.0.0'
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-37.0' 'build-tools;36.0.0'
       - name: Create disposable CI verification key
         shell: bash
         run: |
