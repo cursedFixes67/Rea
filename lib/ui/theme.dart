@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 const dreamMint = Color(0xFFA8E6CF);
 const dreamInk = Color(0xFF0C1418);
 const dreamSurface = Color(0xFF152027);
-const dreamMuted = Color(0xFF91A1A9);
+Color mutedColor(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurfaceVariant;
 
 enum Appearance { dreamDark, midnightOled, aurora, pureLight, custom }
 
@@ -37,6 +38,9 @@ ThemeData dreamTheme(
       ).copyWith(
         primary: light ? const Color(0xFF276C59) : accent,
         surface: background,
+        onSurfaceVariant: light
+            ? const Color(0xFF52626A)
+            : const Color(0xFFA7B4BB),
       );
   return ThemeData(
     useMaterial3: true,
@@ -78,7 +82,7 @@ ThemeData dreamTheme(
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: scheme.onSurface.withValues(alpha: .05),
-      hintStyle: const TextStyle(fontSize: 13, color: dreamMuted),
+      hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,

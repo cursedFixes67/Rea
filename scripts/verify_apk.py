@@ -9,6 +9,7 @@ import re
 import subprocess
 import struct
 import zipfile
+from verify_extension_types import verify as verify_extension_types
 
 parser = argparse.ArgumentParser()
 parser.add_argument('apk', type=Path)
@@ -43,9 +44,11 @@ if 'application-debuggable' in badging:
     raise SystemExit('Release must not be debuggable')
 subprocess.run([str(args.build_tools / 'apksigner'), 'verify', '--verbose', '--print-certs', '--min-sdk-version', '26', str(args.apk)], check=True)
 subprocess.run([str(args.build_tools / 'zipalign'), '-c', '-P', '16', '4', str(args.apk)], check=True)
+type_tokens = verify_extension_types(args.apk, args.build_tools / 'dexdump')
+print(f'Verified {type_tokens} Injekt type token signatures')
 checksum = hashlib.sha256(args.apk.read_bytes()).hexdigest()
 (args.apk.parent / 'SHA256SUMS').write_text(f'{checksum}  {args.apk.name}\n')
 version = re.search(r"versionName='([^']+)'", badging).group(1)
-metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceCommit': os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
+metadata = {'generatedBy': 'CodeRabbit-assisted Dream Reader build', 'applicationId': 'com.dreamreader.app', 'version': version, 'abi': 'arm64-v8a', 'sha256': checksum, 'bytes': args.apk.stat().st_size, 'sourceCommit': os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'staticChecks': ['ZIP CRC', 'release Dart library', 'ARM64 only', 'package ID', 'not debuggable', 'APK signature', '16KB ZIP alignment', '16KB ELF load segments', 'Injekt generic type signatures'], 'deviceChecks': 'See release notes; static verification does not prove runtime compatibility.'}
 (args.apk.parent / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
 print(f'Verified {args.apk.name}: {checksum}')

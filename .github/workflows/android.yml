@@ -2,8 +2,14 @@
 name: Android verification
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_device_tests:
+        description: 'Run optional Android device acceptance tests'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -50,6 +56,7 @@ jobs:
           (root / 'signing.properties').write_text(f'storeFile={root}/ci.jks\nstorePassword={password}\nkeyAlias=ci\nkeyPassword={password}\n')
           PY
       - name: Prepare accelerated Android device
+        if: github.event_name == 'workflow_dispatch' && inputs.run_device_tests
         run: |
           test -c /dev/kvm
           sudo chmod 666 /dev/kvm
@@ -88,12 +95,14 @@ jobs:
           DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
         run: scripts/build_release.sh
       - name: Test real source journey in release mode
+        if: github.event_name == 'workflow_dispatch' && inputs.run_device_tests
         env:
           DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
         run: |
           flutter pub get --enforce-lockfile
           ./android/gradlew -p android app:connectedReleaseAndroidTest -PdreamReleaseTest=true -Ptarget="$PWD/integration_test/source_journey_test.dart" -Ptarget-platform=android-x64 --console=plain
       - name: Install and launch ARM64 artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.run_device_tests
         run: |
           "$ANDROID_HOME/platform-tools/adb" install -r build/release/DreamReader-arm64-release.apk
           "$ANDROID_HOME/platform-tools/adb" logcat -c
@@ -105,7 +114,7 @@ jobs:
           if rg 'FATAL EXCEPTION|Fatal signal' "$RUNNER_TEMP/app-crash.log"; then exit 1; fi
           "$ANDROID_HOME/platform-tools/adb" exec-out screencap -p > "$RUNNER_TEMP/arm64-launch.png"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.run_device_tests
         with:
           name: android-device-evidence
           path: |

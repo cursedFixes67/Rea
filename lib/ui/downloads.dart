@@ -106,7 +106,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         child: Text(
           '${jobs.where((j) => j['status'] == 'SUCCEEDED').length} chapters ready offline',
-          style: const TextStyle(color: dreamMuted, fontSize: 12),
+          style: TextStyle(color: mutedColor(context), fontSize: 12),
         ),
       ),
       Expanded(
@@ -167,8 +167,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           ),
                           Text(
                             '${job['chapter']}',
-                            style: const TextStyle(
-                              color: dreamMuted,
+                            style: TextStyle(
+                              color: mutedColor(context),
                               fontSize: 12,
                             ),
                           ),
@@ -181,8 +181,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           const SizedBox(height: 8),
                           Text(
                             '${job['completed']} / ${job['total']} pages · ${_status('${job['status']}')}',
-                            style: const TextStyle(
-                              color: dreamMuted,
+                            style: TextStyle(
+                              color: mutedColor(context),
                               fontSize: 10,
                             ),
                           ),

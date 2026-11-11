@@ -111,7 +111,13 @@ class DreamDatabase extends _$DreamDatabase {
     });
   }
 
-  Future<void> progress(String key, String url, int page, int total) =>
+  Future<void> progress(
+    String key,
+    String url,
+    int page,
+    int total, {
+    bool allowComplete = true,
+  }) =>
       (update(
         chapterEntries,
       )..where((t) => t.mangaKey.equals(key) & t.url.equals(url))).write(
@@ -120,7 +126,7 @@ class DreamDatabase extends _$DreamDatabase {
           totalPages: Variable(total),
           completed:
               chapterEntries.completed |
-              Variable(total > 0 && page >= total - 1),
+              Variable(allowComplete && total > 0 && page >= total - 1),
           lastRead: Variable(DateTime.now()),
         ),
       );

@@ -40,30 +40,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Your reading space')),
+    appBar: AppBar(title: const Text('Settings')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Row(
+        Row(
           children: [
             DreamMark(size: 44),
             SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dream Reader',
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  'A home for your next chapter',
-                  style: TextStyle(color: dreamMuted, fontSize: 12),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dream Reader',
+                    style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    'A home for your next chapter',
+                    style: TextStyle(color: mutedColor(context), fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        const SectionHeading('Set the mood'),
+        const SectionHeading('Appearance'),
         Wrap(
           spacing: 10,
           runSpacing: 8,
@@ -179,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           onTap: busy ? null : () => _operation(_restore),
         ),
-        const SectionHeading('Reading rhythm'),
+        const SectionHeading('Reading activity'),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.insights),
@@ -214,8 +216,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             return Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceAround,
+                  spacing: 24,
+                  runSpacing: 20,
                   children: [
                     Column(
                       children: [
@@ -226,9 +230,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'minutes read',
-                          style: TextStyle(fontSize: 11, color: dreamMuted),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: mutedColor(context),
+                          ),
                         ),
                       ],
                     ),
@@ -241,9 +248,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'reading days',
-                          style: TextStyle(fontSize: 11, color: dreamMuted),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: mutedColor(context),
+                          ),
                         ),
                       ],
                     ),
@@ -253,10 +263,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
           },
         ),
-        const SectionHeading('Made for your privacy'),
-        const Text(
+        const SectionHeading('Privacy'),
+        Text(
           'Your library and reading history are stored locally. Dream Reader does not collect analytics. Repositories and source websites receive requests when you browse, synchronize or read. Installed extensions share the app’s network and app-storage access.',
-          style: TextStyle(color: dreamMuted, height: 1.7, fontSize: 12),
+          style: TextStyle(
+            color: mutedColor(context),
+            height: 1.7,
+            fontSize: 12,
+          ),
         ),
         const SizedBox(height: 16),
         ListTile(
@@ -266,7 +280,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => showLicensePage(
             context: context,
             applicationName: 'Dream Reader',
-            applicationVersion: '1.0.0',
+            applicationVersion: const String.fromEnvironment(
+              'FLUTTER_BUILD_NAME',
+              defaultValue: '2.0.0',
+            ),
           ),
         ),
       ],
@@ -410,9 +427,13 @@ class _RepositoriesScreenState extends State<RepositoriesScreen> {
             style: TextStyle(fontFamily: 'Newsreader', fontSize: 30),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Repositories publish third-party executable extensions. Only add repositories whose maintainers and signing keys you trust.',
-            style: TextStyle(color: dreamMuted, fontSize: 13, height: 1.7),
+            style: TextStyle(
+              color: mutedColor(context),
+              fontSize: 13,
+              height: 1.7,
+            ),
           ),
           if (busy || widget.state.syncing) const LinearProgressIndicator(),
           const SizedBox(height: 24),
@@ -441,7 +462,10 @@ class _RepositoriesScreenState extends State<RepositoriesScreen> {
                     ),
                     Text(
                       repo.url,
-                      style: const TextStyle(color: dreamMuted, fontSize: 10),
+                      style: TextStyle(
+                        color: mutedColor(context),
+                        fontSize: 10,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SelectableText(
@@ -456,8 +480,8 @@ class _RepositoriesScreenState extends State<RepositoriesScreen> {
                             repo.syncedAt == null
                                 ? 'Not synchronized yet'
                                 : 'Synced ${repo.syncedAt!.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(
-                              color: dreamMuted,
+                            style: TextStyle(
+                              color: mutedColor(context),
                               fontSize: 10,
                             ),
                           ),

@@ -47,9 +47,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Make room for the stories you love. Your library and reading history stay on your device.',
-                style: TextStyle(height: 1.7, color: dreamMuted),
+                style: TextStyle(height: 1.7, color: mutedColor(context)),
               ),
               const SizedBox(height: 28),
               Card(
@@ -88,10 +88,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'No account required. No analytics.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: dreamMuted, fontSize: 11),
+                style: TextStyle(color: mutedColor(context), fontSize: 11),
               ),
             ],
           ),
@@ -117,6 +117,7 @@ class _DreamShellState extends State<DreamShell> {
         widget.state,
         onBrowse: () => setState(() => tab = 2),
         onDownloads: () => setState(() => tab = 4),
+        onLibrary: () => setState(() => tab = 1),
       ),
       LibraryScreen(widget.state),
       BrowseScreen(widget.state),
@@ -325,7 +326,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           child: entries.isEmpty
               ? const EmptyState(
                   icon: Icons.library_books_outlined,
-                  title: 'A shelf of possibilities',
+                  title: 'Your library is empty',
                   message: 'Save titles from Browse to build your collection. Long-press a cover to organize titles into categories.',
                 )
               : list

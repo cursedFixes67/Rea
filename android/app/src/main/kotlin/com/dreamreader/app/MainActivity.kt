@@ -22,13 +22,25 @@ class MainActivity : FlutterActivity() {
     private var captureVolume = false
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val receiver = Messenger(Handler(Looper.getMainLooper()) { message ->
-        pending.remove(message.arg1)?.let { (result, timeout) ->
+        val reply = message.data
+        val request = pending.remove(message.arg1)
+        if (request == null) {
+            activityScope.launch(Dispatchers.IO) { SourceReply.discard(applicationContext, reply) }
+        } else {
+            val (result, timeout) = request
             handler.removeCallbacks(timeout)
-            val error = message.data.getString("error")
+            val error = reply.getString("error")
             if (error != null) result.error("SOURCE_ERROR", error, null)
-            else try { result.success(decode(org.json.JSONTokener(message.data.getString("result") ?: "null").nextValue())) }
-            catch (error: Exception) { result.error("RESPONSE_ERROR", error.message, null) }
-        }; true
+            else activityScope.launch {
+                try {
+                    val value = withContext(Dispatchers.IO) {
+                        decode(org.json.JSONTokener(SourceReply.read(applicationContext, reply)).nextValue())
+                    }
+                    result.success(value)
+                } catch (error: Exception) { result.error("RESPONSE_ERROR", error.message, null) }
+            }
+        }
+        true
     })
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) { service = Messenger(binder) }

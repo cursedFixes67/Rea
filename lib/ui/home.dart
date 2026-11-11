@@ -8,15 +8,17 @@ import 'settings.dart';
 import 'shell.dart' show openManga;
 import 'statistics.dart';
 import 'theme.dart';
+import 'reading_room.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppState state;
-  final VoidCallback onBrowse, onDownloads;
+  final VoidCallback onBrowse, onDownloads, onLibrary;
   const HomeScreen(
     this.state, {
     super.key,
     required this.onBrowse,
     required this.onDownloads,
+    required this.onLibrary,
   });
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -28,9 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
     'recent': 'Recently added',
     'history': 'Recently read',
     'popular': 'Popular discoveries',
-    'recommend': 'Made for your mood',
+    'recommend': 'From your library',
     'sources': 'Your sources',
-    'stats': 'Reading rhythm',
+    'stats': 'Reading activity',
   };
   late List<String> order;
   late Set<String> hidden;
@@ -83,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'A home that feels like you',
+                  'Customize home',
                   style: TextStyle(fontSize: 22, fontFamily: 'Newsreader'),
                 ),
               ),
@@ -159,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: Text(
             subtitle,
-            style: const TextStyle(color: dreamMuted, fontSize: 12),
+            style: TextStyle(color: mutedColor(context), fontSize: 12),
           ),
         ),
       SizedBox(
@@ -216,8 +218,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 10),
                             Text(
                               '${state.chapterStats[manga.key]?['completed'] ?? 0} chapters finished',
-                              style: const TextStyle(
-                                color: dreamMuted,
+                              style: TextStyle(
+                                color: mutedColor(context),
                                 fontSize: 11,
                               ),
                             ),
@@ -225,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               'Continue the journey',
                               style: TextStyle(
-                                color: state.accent,
+                                color: Theme.of(context).colorScheme.primary,
                                 fontSize: 11,
                               ),
                             ),
@@ -242,14 +244,18 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       case 'recent':
         return recent.isEmpty
-            ? EmptyState(
-                icon: Icons.auto_stories_outlined,
-                title: 'Your next story awaits',
-                message: 'Explore sources and save a title. Your personal collection begins with one story.',
-                action: 'Explore sources',
-                onAction: widget.onBrowse,
+            ? Padding(
+                padding: const EdgeInsets.only(top: 28),
+                child: Text(
+                  'Install a source in Browse, then save a title to your library. Your recent additions will appear here.',
+                  style: TextStyle(
+                    color: mutedColor(context),
+                    fontSize: 13,
+                    height: 1.7,
+                  ),
+                ),
               )
-            : shelf('Fresh on your shelves', recent);
+            : shelf('Recently added', recent);
       case 'history':
         return history.length < 2
             ? const SizedBox.shrink()
@@ -321,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return suggestions.isEmpty
             ? const SizedBox.shrink()
             : shelf(
-                'Made for your mood',
+                'From your library',
                 suggestions,
                 subtitle: 'Unread titles with genres you’ve been enjoying.',
               );
@@ -331,14 +337,20 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionHeading(
-              'Doors to new worlds',
+              'Your sources',
               trailing: TextButton(
                 onPressed: widget.onBrowse,
                 child: const Text('View all'),
               ),
             ),
             SizedBox(
-              height: 86,
+              height:
+                  88 +
+                  38 *
+                      (MediaQuery.textScalerOf(context).scale(1) - 1).clamp(
+                        0,
+                        3,
+                      ),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: state.sources.length.clamp(0, 12),
@@ -360,7 +372,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              Icon(Icons.public, color: state.accent),
+                              Icon(
+                                Icons.public,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -376,8 +391,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     Text(
                                       '${source['language']}'.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: dreamMuted,
+                                      style: TextStyle(
+                                        color: mutedColor(context),
                                         fontSize: 10,
                                       ),
                                     ),
@@ -398,47 +413,45 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'stats':
         return Column(
           children: [
-            const SectionHeading('Your reading space'),
-            Row(
-              children: [
-                Expanded(
-                  child: Card(
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Icon(Icons.insights, color: state.accent),
-                      title: Text('${state.library.length} titles'),
-                      subtitle: const Text(
-                        'Explore your rhythm',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ReadingStatisticsScreen(state),
+            const SectionHeading('At a glance'),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked =
+                    constraints.maxWidth < 340 ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                final width = stacked
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 12) / 2;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: QuickAccessTile(
+                        icon: Icons.insights_outlined,
+                        title: 'Statistics',
+                        subtitle: '${state.library.length} titles in library',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReadingStatisticsScreen(state),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Card(
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Icon(
-                        Icons.download_outlined,
-                        color: state.accent,
+                    SizedBox(
+                      width: width,
+                      child: QuickAccessTile(
+                        icon: Icons.download_outlined,
+                        title: 'Downloads',
+                        subtitle: 'Read offline',
+                        onTap: widget.onDownloads,
                       ),
-                      title: const Text('Offline'),
-                      subtitle: const Text(
-                        'Stories for the road',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                      onTap: widget.onDownloads,
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ],
         );
@@ -458,14 +471,15 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const DreamMark(size: 30),
                 const SizedBox(width: 10),
-                const Text(
-                  'dream reader',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.5,
+                const Expanded(
+                  child: Text(
+                    'dream reader',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.5,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 IconButton(
                   tooltip: 'Customize home',
                   onPressed: customize,
@@ -486,69 +500,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 34),
-            const Text(
-              'YOUR DAILY ESCAPE',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 2.5,
-                color: dreamMuted,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Between the pages,\nfind your world.',
-              style: TextStyle(
-                fontFamily: 'Newsreader',
-                fontSize: 42,
-                height: 1.08,
-                letterSpacing: -1.3,
-              ),
-            ),
             const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                gradient: LinearGradient(
-                  colors: [
-                    widget.state.accent.withValues(alpha: .18),
-                    widget.state.accent.withValues(alpha: .03),
-                  ],
-                ),
-                border: Border.all(
-                  color: widget.state.accent.withValues(alpha: .15),
-                ),
+            ReadingRoom(
+              titles: widget.state.library.length,
+              unread: widget.state.chapterStats.values.fold<int>(
+                0,
+                (total, entry) =>
+                    total +
+                    ((entry['total'] as int? ?? 0) -
+                            (entry['completed'] as int? ?? 0))
+                        .clamp(0, 1000000),
               ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'A story for every mood',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Let curiosity choose the next chapter.',
-                          style: TextStyle(color: dreamMuted, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: widget.onBrowse,
-                    tooltip: 'Discover sources',
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                  ),
-                ],
-              ),
+              onBrowse: widget.onBrowse,
+              onLibrary: widget.onLibrary,
             ),
             ...order.where((key) => !hidden.contains(key)).map(section),
           ],

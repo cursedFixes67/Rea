@@ -1,5 +1,5 @@
 package eu.kanade.tachiyomi
 object AppInfo {
-    fun getVersionCode(): Int = 1
-    fun getVersionName(): String = "Dream Reader 1.0.0"
+    fun getVersionCode(): Int = 2
+    fun getVersionName(): String = "Dream Reader 2.0.0"
 }

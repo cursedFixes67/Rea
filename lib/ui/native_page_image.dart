@@ -9,7 +9,14 @@ class NativePageImage extends StatefulWidget {
   final ReaderPage page;
   final SourceEngine engine;
   final bool fit;
-  const NativePageImage(this.page, this.engine, {super.key, this.fit = false});
+  final VoidCallback? onDecoded;
+  const NativePageImage(
+    this.page,
+    this.engine, {
+    super.key,
+    this.fit = false,
+    this.onDecoded,
+  });
   @override
   State<NativePageImage> createState() => _NativePageImageState();
 }
@@ -72,6 +79,10 @@ class _NativePageImageState extends State<NativePageImage> {
         ),
         fit: widget.fit ? BoxFit.contain : BoxFit.fitWidth,
         width: double.infinity,
+        frameBuilder: (_, child, frame, _) {
+          if (frame != null) widget.onDecoded?.call();
+          return child;
+        },
         errorBuilder: (_, error, _) => failure(error),
       );
     },

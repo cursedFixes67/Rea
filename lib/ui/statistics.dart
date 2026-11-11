@@ -138,12 +138,13 @@ class _ReadingStatisticsScreenState extends State<ReadingStatisticsScreen> {
                                     ? Theme.of(context)
                                           .colorScheme
                                           .surfaceContainerHighest
-                                    : widget.state.accent.withValues(
-                                        alpha: (.25 + minutes / 60).clamp(
-                                          .25,
-                                          1,
-                                        ),
-                                      ),
+                                    : Theme.of(context).colorScheme.primary
+                                          .withValues(
+                                            alpha: (.25 + minutes / 60).clamp(
+                                              .25,
+                                              1,
+                                            ),
+                                          ),
                               ),
                             ),
                           ),
@@ -208,7 +209,7 @@ class _ReadingStatisticsScreenState extends State<ReadingStatisticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: widget.state.accent),
+            Icon(icon, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 18),
             Text(
               value,

@@ -159,6 +159,19 @@ class ExtensionEntry {
     this.contentWarning = 0,
   });
   String get language => sources.map((s) => s.language).toSet().join(', ');
+  // Values follow Mihon's current NetworkExtensionStore protobuf enum.
+  bool get adultOnly => contentWarning == 3;
+  String get contentLabel => switch (contentWarning) {
+    2 => 'Mixed content',
+    3 => 'Adult content',
+    _ => '',
+  };
+  bool matchesSearch(String query) {
+    final term = query.trim().toLowerCase();
+    return name.toLowerCase().contains(term) ||
+        sources.any((s) => s.name.toLowerCase().contains(term));
+  }
+
   Json toJson() => {
     'name': name,
     'packageName': packageName,

@@ -48,6 +48,16 @@ class _ReaderScreenState extends State<ReaderScreen>
   bool autoNext = true;
   bool reverseTapZones = false;
   int loadGeneration = 0;
+  final decodedPages = <int>{};
+  bool get canComplete =>
+      pages.isNotEmpty && decodedPages.contains(pages.length - 1);
+  void _decoded(int index, int generation) {
+    if (!mounted || generation != loadGeneration || !decodedPages.add(index)) {
+      return;
+    }
+    _save();
+  }
+
   String? prefetchedChapter;
   Future<List<ReaderPage>>? prefetchedPages;
   Json bookmarks = {};
@@ -98,21 +108,28 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   Future<void> _load() async {
     final generation = ++loadGeneration;
+    final requestedChapter = chapter;
     saveTimer?.cancel();
     setState(() {
       loading = true;
       pages = [];
+      decodedPages.clear();
       error = null;
     });
     try {
       final records = await widget.state.db.chapters(widget.manga.key);
-      current =
-          records.where((r) => r.url == chapter.url).firstOrNull?.page ?? 0;
+      if (!mounted || generation != loadGeneration) return;
+      final resumePage =
+          records
+              .where((r) => r.url == requestedChapter.url)
+              .firstOrNull
+              ?.page ??
+          0;
       List<ReaderPage>? local;
       if (widget.state.engine.available) {
         try {
           final result = await widget.state.engine.call('downloadPages', {
-            'key': '${widget.manga.key}::${chapter.url}',
+            'key': '${widget.manga.key}::${requestedChapter.url}',
           });
           if (result is List && result.isNotEmpty) {
             local = result
@@ -123,15 +140,18 @@ class _ReaderScreenState extends State<ReaderScreen>
           /* Online source remains available when no download exists. */
         }
       }
-      final prefetched = prefetchedChapter == chapter.url
+      final prefetched = prefetchedChapter == requestedChapter.url
           ? prefetchedPages
           : null;
       var loadedPages =
           local ??
           await (prefetched ??
-              widget.state.engine.pages(widget.manga, chapter));
+              widget.state.engine.pages(widget.manga, requestedChapter));
       if (loadedPages.isEmpty && prefetched != null) {
-        loadedPages = await widget.state.engine.pages(widget.manga, chapter);
+        loadedPages = await widget.state.engine.pages(
+          widget.manga,
+          requestedChapter,
+        );
       }
       if (!mounted || generation != loadGeneration) return;
       pages = loadedPages;
@@ -140,7 +160,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       if (pages.isEmpty) {
         throw StateError('The source returned no pages for this chapter.');
       }
-      current = current.clamp(0, pages.length - 1);
+      current = resumePage.clamp(0, pages.length - 1);
       pager?.dispose();
       pager = PageController(initialPage: doublePage ? current ~/ 2 : current);
       if (mounted) {
@@ -154,7 +174,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         _preload();
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == loadGeneration) {
         setState(() {
           error = e;
           loading = false;
@@ -167,8 +187,15 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (pages.isEmpty) return;
     saveTimer?.cancel();
     final url = chapter.url, position = savedPage, total = pages.length;
+    final allowComplete = canComplete;
     saveTimer = Timer(const Duration(milliseconds: 500), () {
-      widget.state.db.progress(widget.manga.key, url, position, total);
+      widget.state.db.progress(
+        widget.manga.key,
+        url,
+        position,
+        total,
+        allowComplete: allowComplete,
+      );
     });
   }
 
@@ -251,6 +278,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       chapter.url,
       pages.length - 1,
       pages.length,
+      allowComplete: canComplete,
     );
     chapter = widget.chapters[index + 1];
     await _load();
@@ -277,6 +305,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         chapter.url,
         savedPage,
         pages.length,
+        allowComplete: canComplete,
       );
     }
     widget.state.db
@@ -306,12 +335,24 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   Widget _image(int index, {bool fit = false}) {
     final page = pages[index];
+    final generation = loadGeneration;
+    Widget decodedFrame(
+      BuildContext context,
+      Widget child,
+      int? frame,
+      bool sync,
+    ) {
+      if (frame != null) _decoded(index, generation);
+      return child;
+    }
+
     if (widget.state.engine.available && page.sourceId.isNotEmpty) {
       return NativePageImage(
         page,
         widget.state.engine,
         key: ValueKey('${page.sourceId}:${page.url}'),
         fit: fit,
+        onDecoded: () => _decoded(index, generation),
       );
     }
     final failure = Container(
@@ -345,6 +386,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         ),
         fit: fit ? BoxFit.contain : BoxFit.fitWidth,
         width: double.infinity,
+        frameBuilder: decodedFrame,
         errorBuilder: (_, _, _) => failure,
       );
     }
@@ -363,6 +405,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               height: 260,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
+      frameBuilder: decodedFrame,
       errorBuilder: (_, _, _) => failure,
     );
   }

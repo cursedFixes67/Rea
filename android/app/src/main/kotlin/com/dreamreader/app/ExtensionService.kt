@@ -18,11 +18,11 @@ class ExtensionService : Service() {
                 val result = withTimeout(if (method == "install") 180000L else 90000L) {
                     ExtensionRuntime.get(applicationContext).execute(method, JSONObject(arguments))
                 }
-                bundle.putString("result", result.toString())
+                SourceReply.write(applicationContext, bundle, result.toString())
             } catch (error: Throwable) {
                 bundle.putString("error", SourceErrors.describe(error))
             }
-            try { reply.send(Message.obtain().apply { arg1 = requestId; data = bundle }) } catch (_: RemoteException) { }
+            try { reply.send(Message.obtain().apply { arg1 = requestId; data = bundle }) } catch (_: RemoteException) { SourceReply.discard(applicationContext, bundle) }
         }
         true
     })

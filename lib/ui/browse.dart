@@ -27,279 +27,333 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final extensions = state.catalogue
         .where(
           (e) =>
-              e.name.toLowerCase().contains(query.toLowerCase()) &&
+              e.matchesSearch(query) &&
               (language == 'all' ||
                   e.sources.any((s) => s.language == language)) &&
-              (mature || e.contentWarning < 2),
+              (mature || !e.adultOnly),
         )
         .toList();
     final sources = state.sources
         .where(
-          (s) => '${s['name']}'.toLowerCase().contains(query.toLowerCase()),
+          (s) =>
+              '${s['name']}'.toLowerCase().contains(query.trim().toLowerCase()),
         )
         .toList();
     final languages = {
       'all',
       ...state.catalogue.expand((e) => e.sources.map((s) => s.language)),
     }.toList()..sort();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 16, 14),
-          child: Row(
+    return NestedScrollView(
+      headerSliverBuilder: (context, scrolled) => [
+        SliverToBoxAdapter(
+          child: Column(
             children: [
-              const Expanded(
-                child: Text(
-                  'Find your next world',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.8,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Search all sources',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => GlobalSearchScreen(state)),
-                ),
-                icon: const Icon(Icons.travel_explore),
-              ),
-              IconButton(
-                tooltip: 'Manage repositories',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => RepositoriesScreen(state)),
-                ),
-                icon: const Icon(Icons.dns_outlined),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<int>(
-                  segments: const [
-                    ButtonSegment(value: 0, label: Text('Sources')),
-                    ButtonSegment(value: 1, label: Text('Extensions')),
-                  ],
-                  selected: {section},
-                  onSelectionChanged: (v) => setState(() => section = v.first),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: state.syncing
-                    ? null
-                    : () async {
-                        await state.syncRepositories();
-                        if (state.engine.available) {
-                          await state.refreshSources();
-                        }
-                      },
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-          child: TextField(
-            onChanged: (s) => setState(() => query = s),
-            decoration: InputDecoration(
-              hintText: section == 0
-                  ? 'Search installed sources'
-                  : 'Search the live catalogue',
-              prefixIcon: const Icon(Icons.search, size: 20),
-            ),
-          ),
-        ),
-        if (state.syncing) const LinearProgressIndicator(),
-        if (state.syncError != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              '${state.syncError}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-        if (section == 1)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                DropdownButton<String>(
-                  value: language,
-                  items: languages
-                      .map(
-                        (l) => DropdownMenuItem(
-                          value: l,
-                          child: Text(
-                            l == 'all' ? 'All languages' : l.toUpperCase(),
-                          ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 16, 14),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Explore sources',
+                        style: TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -.8,
                         ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => language = v!),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Search all sources',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GlobalSearchScreen(state),
+                        ),
+                      ),
+                      icon: const Icon(Icons.travel_explore),
+                    ),
+                    IconButton(
+                      tooltip: 'Manage repositories',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RepositoriesScreen(state),
+                        ),
+                      ),
+                      icon: const Icon(Icons.dns_outlined),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                const Text('Mature', style: TextStyle(fontSize: 11)),
-                Switch(
-                  value: mature,
-                  onChanged: (v) => setState(() => mature = v),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: section == 0
-              ? sources.isEmpty
-                    ? ListView(
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                    ? Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          EmptyState(
-                            icon: Icons.travel_explore,
-                            title: 'Open a new door',
-                            message: 'Install a source extension to browse its catalogue and read chapters.',
-                            action: 'Discover extensions',
-                            onAction: () {
-                              setState(() => section = 1);
-                              if (state.catalogue.isEmpty) {
-                                state.syncRepositories();
-                              }
-                            },
-                          ),
-                          ...state.sourceErrors.map(
-                            (e) => ListTile(
-                              leading: const Icon(Icons.error_outline),
-                              title: Text('${e['packageName'] ?? 'Engine'}'),
-                              subtitle: Text('${e['message']}'),
+                          for (final entry in {
+                            0: 'Installed',
+                            1: 'Catalogue',
+                          }.entries)
+                            ChoiceChip(
+                              label: Text(entry.value),
+                              selected: section == entry.key,
+                              onSelected: (_) =>
+                                  setState(() => section = entry.key),
                             ),
-                          ),
+                          _refreshButton(),
                         ],
                       )
-                    : ListView.builder(
-                        itemCount: sources.length,
-                        itemBuilder: (_, i) {
-                          final source = sources[i];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 9,
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: SegmentedButton<int>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: 0,
+                                  label: Text('Installed'),
+                                ),
+                                ButtonSegment(
+                                  value: 1,
+                                  label: Text('Catalogue'),
+                                ),
+                              ],
+                              selected: {section},
+                              onSelectionChanged: (v) =>
+                                  setState(() => section = v.first),
                             ),
-                            leading: CircleAvatar(
-                              backgroundColor: state.accent.withValues(
-                                alpha: .1,
-                              ),
-                              child: Icon(Icons.public, color: state.accent),
-                            ),
-                            title: Text(
-                              '${source['name']}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${source['language']}'.toUpperCase(),
-                            ),
-                            trailing: source['preferences'] == true
-                                ? IconButton(
-                                    tooltip: 'Source preferences',
-                                    icon: const Icon(Icons.tune),
-                                    onPressed: () => state.engine.call(
-                                      'preferences',
-                                      {'sourceId': source['id']},
-                                    ),
-                                  )
-                                : const Icon(Icons.chevron_right),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SourceScreen(state, source),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-              : extensions.isEmpty
-              ? EmptyState(
-                  icon: Icons.extension_outlined,
-                  title: state.syncing
-                      ? 'Gathering your sources'
-                      : 'No matching extensions',
-                  message: state.repositoryList.isEmpty
-                      ? 'Add a repository to discover community sources.'
-                      : 'Refresh the catalogue or adjust your language and content filters.',
-                  action: 'Manage repositories',
-                  onAction: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RepositoriesScreen(state),
+                          ),
+                          const SizedBox(width: 8),
+                          _refreshButton(),
+                        ],
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                child: TextField(
+                  onChanged: (s) => setState(() => query = s),
+                  decoration: InputDecoration(
+                    hintText: section == 0
+                        ? 'Search installed sources'
+                        : 'Search the live catalogue',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                  ),
+                ),
+              ),
+              if (state.syncing) const LinearProgressIndicator(),
+              if (state.syncError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    '${state.syncError}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: extensions.length,
-                  itemBuilder: (_, i) {
-                    final extension = extensions[i];
-                    final current = state.installed[extension.packageName];
-                    final installed = current != null;
-                    final outdated =
-                        installed && (current['code'] as int) < extension.code;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 8,
-                      ),
-                      leading: CoverImage(
-                        extension.iconUrl,
-                        width: 44,
-                        height: 44,
-                      ),
-                      title: Text(
-                        extension.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${extension.language.toUpperCase()} · v${extension.version} · API ${extension.api}',
-                        style: const TextStyle(fontSize: 10, color: dreamMuted),
-                      ),
-                      trailing: installing == extension.packageName
-                          ? const SizedBox.square(
-                              dimension: 23,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : TextButton(
-                              onPressed: installing != null
-                                  ? null
-                                  : installed && !outdated
-                                  ? () => _remove(extension)
-                                  : () => _install(extension),
-                              child: Text(
-                                outdated
-                                    ? 'Update'
-                                    : installed
-                                    ? 'Remove'
-                                    : 'Install',
-                              ),
-                            ),
-                    );
-                  },
                 ),
+              if (section == 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DropdownButton<String>(
+                        isExpanded:
+                            MediaQuery.textScalerOf(context).scale(1) > 1.3,
+                        itemHeight: null,
+                        value: language,
+                        items: languages
+                            .map(
+                              (l) => DropdownMenuItem(
+                                value: l,
+                                child: Text(
+                                  l == 'all'
+                                      ? 'All languages'
+                                      : l.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => language = v!),
+                      ),
+                      FilterChip(
+                        label: const Text('Adult sources'),
+                        selected: mature,
+                        onSelected: (v) => setState(() => mature = v),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
+      body: section == 0
+          ? sources.isEmpty
+                ? ListView(
+                    children: [
+                      EmptyState(
+                        icon: Icons.travel_explore,
+                        title: query.trim().isEmpty
+                            ? 'Choose your sources'
+                            : 'Not installed yet',
+                        message: query.trim().isEmpty
+                            ? 'Install a source from the catalogue to start browsing its titles.'
+                            : extensions.isNotEmpty
+                            ? '${extensions.length} matching extensions are available in your catalogue.'
+                            : 'No installed source matches “${query.trim()}”. Search the catalogue or refresh your repositories.',
+                        action: query.trim().isEmpty
+                            ? 'Browse catalogue'
+                            : 'Search catalogue',
+                        onAction: () {
+                          setState(() => section = 1);
+                          if (state.catalogue.isEmpty) {
+                            state.syncRepositories();
+                          }
+                        },
+                      ),
+                      ...state.sourceErrors.map(
+                        (e) => ListTile(
+                          leading: const Icon(Icons.error_outline),
+                          title: Text('${e['packageName'] ?? 'Engine'}'),
+                          subtitle: Text('${e['message']}'),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    itemCount: sources.length,
+                    itemBuilder: (_, i) {
+                      final source = sources[i];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 9,
+                        ),
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(context).colorScheme.primary
+                              .withValues(alpha: .1),
+                          child: Icon(
+                            Icons.public,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        title: Text(
+                          '${source['name']}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text('${source['language']}'.toUpperCase()),
+                        trailing: source['preferences'] == true
+                            ? IconButton(
+                                tooltip: 'Source preferences',
+                                icon: const Icon(Icons.tune),
+                                onPressed: () => state.engine.call(
+                                  'preferences',
+                                  {'sourceId': source['id']},
+                                ),
+                              )
+                            : const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SourceScreen(state, source),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+          : extensions.isEmpty
+          ? EmptyState(
+              icon: Icons.extension_outlined,
+              title: state.syncing
+                  ? 'Gathering your sources'
+                  : 'No matching extensions',
+              message: state.repositoryList.isEmpty
+                  ? 'Add a repository to discover community sources.'
+                  : 'Refresh the catalogue or adjust your language and content filters.',
+              action: 'Manage repositories',
+              onAction: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RepositoriesScreen(state)),
+              ),
+            )
+          : ListView.builder(
+              itemCount: extensions.length,
+              itemBuilder: (_, i) {
+                final extension = extensions[i];
+                final current = state.installed[extension.packageName];
+                final installed = current != null;
+                final outdated =
+                    installed && (current['code'] as int) < extension.code;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
+                  leading: CoverImage(extension.iconUrl, width: 44, height: 44),
+                  title: Text(
+                    extension.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${extension.sources.length > 2 ? '${extension.sources.length} languages' : extension.language.toUpperCase()} · v${extension.version}${extension.contentLabel.isEmpty ? '' : ' · ${extension.contentLabel}'}',
+                    style: TextStyle(fontSize: 10, color: mutedColor(context)),
+                  ),
+                  trailing: installing == extension.packageName
+                      ? const SizedBox.square(
+                          dimension: 23,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : TextButton(
+                          onPressed: installing != null
+                              ? null
+                              : installed && !outdated
+                              ? () => _remove(extension)
+                              : () => _install(extension),
+                          child: Text(
+                            outdated
+                                ? 'Update'
+                                : installed
+                                ? 'Remove'
+                                : 'Install',
+                          ),
+                        ),
+                );
+              },
+            ),
     );
   }
+
+  Widget _refreshButton() => IconButton(
+    tooltip: 'Refresh',
+    onPressed: widget.state.syncing
+        ? null
+        : () async {
+            try {
+              await widget.state.syncRepositories();
+              if (widget.state.engine.available) {
+                await widget.state.refreshSources();
+              }
+            } catch (error) {
+              if (mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('$error')));
+              }
+            }
+          },
+    icon: const Icon(Icons.refresh),
+  );
 
   Future<void> _install(ExtensionEntry entry) async {
     final accepted = await showDialog<bool>(
@@ -314,6 +368,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
               const Text(
                 'Extensions execute third-party code with Dream Reader’s network and app-storage access. A separate process provides crash separation, not a security sandbox.',
               ),
+              if (entry.contentLabel.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '${entry.contentLabel}: this source may include adult titles. Use its source preferences to control available content.',
+                ),
+              ],
               const SizedBox(height: 16),
               Text(
                 'Repository: ${entry.repository}\n\nSigner SHA-256:\n${entry.signer}',

@@ -31,7 +31,7 @@ class SectionHeading extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     subtitle!,
-                    style: const TextStyle(color: dreamMuted, fontSize: 12),
+                    style: TextStyle(color: mutedColor(context), fontSize: 12),
                   ),
                 ),
             ],
@@ -60,8 +60,12 @@ class CoverImage extends StatelessWidget {
       width: width,
       height: height,
       color: Theme.of(context).colorScheme.primary.withValues(alpha: .08),
-      child: const Center(
-        child: Icon(Icons.auto_stories_outlined, color: dreamMuted, size: 30),
+      child: Center(
+        child: Icon(
+          Icons.auto_stories_outlined,
+          color: mutedColor(context),
+          size: 30,
+        ),
       ),
     );
     return ClipRRect(
@@ -114,12 +118,13 @@ class MangaCard extends StatelessWidget {
                 if (selected)
                   Container(
                     decoration: BoxDecoration(
-                      color: dreamMint.withValues(alpha: .3),
+                      color: Theme.of(context).colorScheme.primary
+                          .withValues(alpha: .3),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_circle,
-                      color: dreamMint,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 32,
                     ),
                   ),
@@ -160,48 +165,53 @@ class EmptyState extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 390),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: .08),
+    child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 390),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Theme.of(context).colorScheme.primary
+                      .withValues(alpha: .08),
+                ),
+                child: Icon(
+                  icon,
+                  size: 36,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 36,
-                color: Theme.of(context).colorScheme.primary,
+              const SizedBox(height: 22),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'Newsreader', fontSize: 29),
               ),
-            ),
-            const SizedBox(height: 22),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Newsreader', fontSize: 29),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.7,
-                color: dreamMuted,
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.7,
+                  color: mutedColor(context),
+                ),
               ),
-            ),
-            if (action != null && onAction != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 24),
-                child: FilledButton(onPressed: onAction, child: Text(action!)),
-              ),
-          ],
+              if (action != null && onAction != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 24),
+                  child: FilledButton(
+                    onPressed: onAction,
+                    child: Text(action!),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     ),
@@ -215,9 +225,53 @@ class ErrorNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EmptyState(
     icon: Icons.cloud_off_outlined,
-    title: 'A pause in the story',
+    title: 'Couldn’t load this',
     message: error.toString().replaceFirst('Exception: ', ''),
     action: retry == null ? null : 'Try again',
     onAction: retry,
+  );
+}
+
+class QuickAccessTile extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback onTap;
+  const QuickAccessTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.5,
+                color: mutedColor(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }

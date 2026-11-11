@@ -242,8 +242,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                             if (manga.author.isNotEmpty)
                               Text(
                                 manga.author,
-                                style: const TextStyle(
-                                  color: dreamMuted,
+                                style: TextStyle(
+                                  color: mutedColor(context),
                                   fontSize: 12,
                                 ),
                               ),
@@ -253,8 +253,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text(
                                   'Art · ${manga.artist}',
-                                  style: const TextStyle(
-                                    color: dreamMuted,
+                                  style: TextStyle(
+                                    color: mutedColor(context),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -271,7 +271,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                 _ => 'Status unknown',
                               },
                               style: TextStyle(
-                                color: widget.state.accent,
+                                color: Theme.of(context).colorScheme.primary,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -279,8 +279,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                             const SizedBox(height: 14),
                             Text(
                               '${chapters.length} chapters',
-                              style: const TextStyle(
-                                color: dreamMuted,
+                              style: TextStyle(
+                                color: mutedColor(context),
                                 fontSize: 11,
                               ),
                             ),
@@ -351,8 +351,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                           padding: const EdgeInsets.only(bottom: 20),
                           child: Text(
                             manga.description,
-                            style: const TextStyle(
-                              color: dreamMuted,
+                            style: TextStyle(
+                              color: mutedColor(context),
                               height: 1.7,
                               fontSize: 13,
                             ),
@@ -505,8 +505,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                             ? Icons.check_circle_outline
                             : Icons.menu_book_outlined,
                         color: record?.completed == true
-                            ? dreamMuted
-                            : widget.state.accent,
+                            ? mutedColor(context)
+                            : Theme.of(context).colorScheme.primary,
                         size: 20,
                       ),
                 title: Text(
@@ -514,7 +514,9 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: record?.completed == true ? dreamMuted : null,
+                    color: record?.completed == true
+                        ? mutedColor(context)
+                        : null,
                   ),
                 ),
                 subtitle: record?.lastRead != null

@@ -12,7 +12,13 @@ object SourceBridge {
         val receiver = Messenger(Handler(Looper.getMainLooper()) { message ->
             val error = message.data.getString("error")
             if (error != null) response.completeExceptionally(IllegalStateException(error))
-            else runCatching { JSONObject(message.data.getString("result") ?: "{}") }.fold(response::complete, response::completeExceptionally)
+            else {
+                val data = message.data
+                launch(Dispatchers.IO) {
+                    runCatching { JSONObject(SourceReply.read(context, data)) }
+                        .fold(response::complete, response::completeExceptionally)
+                }
+            }
             true
         })
         val connection = object : ServiceConnection {

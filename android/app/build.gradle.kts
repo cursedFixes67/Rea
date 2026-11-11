@@ -69,6 +69,7 @@ flutter {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     if (project.hasProperty("dreamReleaseTest")) {
         implementation(project(":integration_test"))
     }
