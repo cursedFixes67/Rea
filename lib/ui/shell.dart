@@ -388,9 +388,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
           child: TextField(
             controller: queryController,
             onChanged: (s) => setState(() => query = s),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Find a story in your library',
-              prefixIcon: Icon(Icons.search, size: 20),
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear library search',
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => setState(() {
+                        query = '';
+                        queryController.clear();
+                      }),
+                    ),
             ),
           ),
         ),

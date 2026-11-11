@@ -1,6 +1,6 @@
 <!-- coderabbit-ai-generated:v1 -->
 
-<!-- coderabbit-ai-generated-section:v1:de00d9b7e36096f53ba06954df51f492bfa1da77c5df04f929e735f2a930f69b -->
+<!-- coderabbit-ai-generated-section:v1:08b43f29563d721aeb90f59a55d5ad3e381fa46f4e4a71e01d7d10cc08c91a2c -->
 
 # Verification status
 
@@ -24,6 +24,8 @@ The release DEX checks passed 60 Injekt generic type tokens and 1,030 actual hos
 - Android acceptance test sources and APK compiled successfully after aligning Flutter's older transitive test dependencies. No instrumentation execution is claimed.
 - The pinned QuickJS JNI sources passed a Linux host harness for primitive values, errors, 24 concurrent independent evaluations and context reset. This is not an Android binary execution.
 - SQLite scale fixture: 3,000 titles and 30,000 chapters, correct indexed/paginated results. Observed host queries were approximately 14 ms for the first 201 update rows and 100 ms for library/aggregate retrieval; these are not phone frame-rate measurements.
+- Browser scale acceptance imported 3,000 synthetic titles and 30,000 chapter records. Deep scrolling kept 12–18 card semantics mounted; searching after the jump returned the correct single title. These CPU-rendered browser observations are not Android FPS claims.
+- Browser restore preview and repeated merge preserved existing titles without duplicates. Automated file upload exercised the application flow; the cloud browser's native chooser terminated its session, so native picker behavior is not claimed as verified.
 - The live official catalogue was parsed with 1,587 observed entries. Cloud Preview exercised catalogue refresh, Atsumaru/Kagane visibility with adult-only sources disabled, Home customization, Theme Studio and dark/light appearances.
 
 ## Device acceptance remains with the owner

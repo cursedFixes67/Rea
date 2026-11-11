@@ -92,6 +92,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Zeta'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Zeta');
+      await tester.pump();
+      expect(find.text('No matching titles'), findsOneWidget);
+      await tester.tap(find.byTooltip('Clear library search'));
+      await tester.pump();
+      // Clearing text preserves the user's active offline filter.
+      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Zeta'), findsNothing);
+      expect(find.byTooltip('Clear library search'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

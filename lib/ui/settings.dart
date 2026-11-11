@@ -323,6 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? await compute(MihonBackupImporter.decode, bytes)
         : await compute(BackupCodec.decode, bytes);
     BackupSettings.validate(payload['settings']);
+    final importNotes = '${payload['importNotes'] ?? ''}'.trim();
     if (!mounted) return;
     final proceed = await showDialog<bool>(
       context: context,
@@ -330,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Restore preview'),
         content: SingleChildScrollView(
           child: Text(
-            '${payload['importNotes'] ?? ''}\n\n${(payload['library'] as List).length} library entries\n${(payload['chapters'] as List).length} chapter records\n${(payload['repositories'] as List).length} repositories\n\nExisting library and chapter records are preserved. New entries are merged. Extension APKs must be installed again. Downloaded image files are not included; download those chapters again. Existing settings are preserved. Imported repositories are disabled until you review and enable them.',
+            '${importNotes.isEmpty ? '' : '$importNotes\n\n'}${(payload['library'] as List).length} library entries\n${(payload['chapters'] as List).length} chapter records\n${(payload['repositories'] as List).length} repositories\n\nExisting library and chapter records are preserved. New entries are merged. Extension APKs must be installed again. Downloaded image files are not included; download those chapters again. Existing settings are preserved. Imported repositories are disabled until you review and enable them.',
           ),
         ),
         actions: [
