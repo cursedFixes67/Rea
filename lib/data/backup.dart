@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'backup_settings.dart';
+
 class BackupCodec {
   static Uint8List encode(Map<String, dynamic> payload) {
     final data = jsonEncode(payload);
@@ -41,6 +43,7 @@ class BackupCodec {
         payload['repositories'] is! List) {
       throw const FormatException('Backup contents are incomplete');
     }
+    BackupSettings.validate(payload['settings']);
     return payload;
   }
 }

@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../data/app_state.dart';
 import '../data/backup.dart';
+import '../data/backup_settings.dart';
 import '../data/mihon_backup.dart';
 import '../data/repositories.dart';
 import 'theme.dart';
@@ -306,6 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final payload = bytes.length >= 2 && bytes[0] == 31 && bytes[1] == 139
         ? await compute(MihonBackupImporter.decode, bytes)
         : await compute(BackupCodec.decode, bytes);
+    BackupSettings.validate(payload['settings']);
     if (!mounted) return;
     final proceed = await showDialog<bool>(
       context: context,

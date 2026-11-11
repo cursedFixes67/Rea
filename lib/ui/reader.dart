@@ -72,7 +72,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     try {
       bookmarks = Map<String, dynamic>.from(
         jsonDecode(widget.state.preferences.getString('bookmarks') ?? '{}'),
-      );
+      )..removeWhere((key, value) => value is! int || value < 0);
     } catch (_) {
       bookmarks = {};
     }
