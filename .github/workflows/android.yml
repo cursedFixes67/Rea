@@ -19,6 +19,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle.kts
+            android/gradle.properties
+            pubspec.lock
       - name: Install pinned Flutter
         shell: bash
         run: |
@@ -55,8 +60,20 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-35;google_apis;x86_64' 'emulator'
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name dream-ci --package 'system-images;android-35;google_apis;x86_64'
           "$ANDROID_HOME/emulator/emulator" -avd dream-ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2048 > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          "$ANDROID_HOME/platform-tools/adb" wait-for-device
-          timeout 240 bash -c 'until [ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 3; done'
+          emulator_pid=$!
+          ready=false
+          boot_deadline=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$boot_deadline" ]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then cat "$RUNNER_TEMP/emulator.log"; exit 1; fi
+            boot_state="$(timeout 5 "$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [ "$boot_state" = 1 ]; then ready=true; break; fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/emulator.log"
+            timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -b crash || true
+            exit 1
+          fi
           "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
           "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
           "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0

@@ -165,12 +165,9 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final progressByUrl = {for (final record in progress) record.url: record};
     final visible = chapters
-        .where(
-          (c) =>
-              !unreadOnly ||
-              !progress.any((p) => p.url == c.url && p.completed),
-        )
+        .where((c) => !unreadOnly || progressByUrl[c.url]?.completed != true)
         .toList();
     if (reverse) {
       visible.sort((a, b) => a.number.compareTo(b.number));
@@ -178,7 +175,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
     final ordered = [...chapters]..sort((a, b) => a.number.compareTo(b.number));
     final next =
         ordered
-            .where((c) => !progress.any((p) => p.url == c.url && p.completed))
+            .where((c) => progressByUrl[c.url]?.completed != true)
             .firstOrNull ??
         ordered.firstOrNull;
     return Scaffold(
@@ -205,7 +202,12 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                 ),
               IconButton(
                 tooltip: 'Refresh details',
-                onPressed: loading ? null : _load,
+                onPressed: loading
+                    ? null
+                    : () async {
+                        await _load();
+                        await _loadDownloads();
+                      },
                 icon: const Icon(Icons.refresh),
               ),
             ],
@@ -383,9 +385,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                   .where(
                                     (c) =>
                                         choice == 'all' ||
-                                        !progress.any(
-                                          (p) => p.url == c.url && p.completed,
-                                        ),
+                                        progressByUrl[c.url]?.completed != true,
                                   )
                                   .map((c) => c.url),
                             );
@@ -473,7 +473,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
             itemCount: visible.length,
             itemBuilder: (_, i) {
               final c = visible[i];
-              final record = progress.where((p) => p.url == c.url).firstOrNull;
+              final record = progressByUrl[c.url];
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 24,
