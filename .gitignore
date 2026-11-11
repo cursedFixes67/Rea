@@ -52,3 +52,5 @@ app.*.map.json
 *.keystore
 **/signing.properties
 **/key.properties
+
+/web/*.js.deps
