@@ -1,0 +1,65 @@
+# Generated with CodeRabbit. Requires repository-owner configured signing secrets.
+name: Signed Android release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing reviewed tag, for example v1.0.0'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install pinned Flutter and Android SDK
+        run: |
+          git init "$RUNNER_TEMP/flutter"
+          git -C "$RUNNER_TEMP/flutter" remote add origin https://github.com/flutter/flutter.git
+          git -C "$RUNNER_TEMP/flutter" fetch --depth 1 origin refs/tags/3.47.9:refs/tags/3.47.9
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-list -n 1 3.47.9)" = c197ca5199e9ee5661e865596c9c07294dfab51c
+          git -C "$RUNNER_TEMP/flutter" checkout -b stable 3.47.9
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Materialize private signing configuration
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          umask 077
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          for name in ('KEYSTORE_BASE64','STORE_PASSWORD','KEY_PASSWORD','KEY_ALIAS'):
+              if not os.environ.get(name): raise SystemExit(f'Missing release secret: {name}')
+          (root / 'release.jks').write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          def escape(value): return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
+          (root / 'signing.properties').write_text(f'storeFile={root}/release.jks\n' + '\n'.join(f'{key}={escape(os.environ[env])}' for key, env in [('storePassword','STORE_PASSWORD'),('keyPassword','KEY_PASSWORD'),('keyAlias','KEY_ALIAS')]) + '\n')
+          PY
+      - name: Build and statically verify signed release
+        env:
+          DREAM_READER_SIGNING_PROPERTIES: ${{ runner.temp }}/signing.properties
+        run: scripts/build_release.sh
+      - name: Publish reviewed release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          test -f "docs/releases/$RELEASE_TAG.md"
+          gh release create "$RELEASE_TAG" build/release/DreamReader-arm64-release.apk build/release/SHA256SUMS build/release/build-info.json build/release/INSTALLATION.md --verify-tag --title "Dream Reader $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
+      - name: Remove private signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/signing.properties"
