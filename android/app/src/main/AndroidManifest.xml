@@ -37,6 +37,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <activity android:name="com.linusu.flutter_web_auth_2.CallbackActivity" android:exported="true" android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.dreamreader.app.auth"/>
+            </intent-filter>
+        </activity>
         <activity android:name=".SourceWebActivity" android:process=":extensions" android:exported="false"/>
         <service android:name=".ExtensionService" android:process=":extensions" android:exported="false"/>
         <activity android:name=".SourcePreferencesActivity" android:process=":extensions" android:exported="false" android:theme="@style/SourcePreferencesTheme"/>

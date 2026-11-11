@@ -10,12 +10,14 @@ import '../platform/engine.dart';
 import '../ui/theme.dart';
 import 'database.dart';
 import 'repositories.dart';
+import 'tracking.dart';
 
 class AppState extends ChangeNotifier {
   final DreamDatabase db;
   final SharedPreferences preferences;
   final SourceEngine engine;
   final RepositoryService repositories;
+  late final tracking = TrackingService(preferences);
   List<LibraryEntry> library = [];
   List<ExtensionEntry> catalogue = [];
   List<Json> sources = [], sourceErrors = [];

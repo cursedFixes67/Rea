@@ -8,6 +8,7 @@ import '../data/database.dart';
 import 'components.dart';
 import 'theme.dart';
 import 'reader.dart';
+import 'tracking.dart';
 
 class MangaDetailsScreen extends StatefulWidget {
   final AppState state;
@@ -191,6 +192,17 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
+              if (widget.state.engine.available)
+                IconButton(
+                  tooltip: 'Track this title',
+                  icon: const Icon(Icons.sync),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MangaTrackingScreen(widget.state, manga),
+                    ),
+                  ),
+                ),
               IconButton(
                 tooltip: 'Refresh details',
                 onPressed: loading ? null : _load,

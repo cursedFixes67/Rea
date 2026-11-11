@@ -12,6 +12,7 @@ import 'theme.dart';
 import 'statistics.dart';
 import 'backup_schedule.dart';
 import 'components.dart';
+import 'tracking.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AppState state;
@@ -133,6 +134,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (mounted) setState(() {});
           },
         ),
+        if (widget.state.engine.available)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.sync),
+            title: const Text('Tracking connections'),
+            subtitle: const Text('AniList and MyAnimeList'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TrackingConnectionsScreen(widget.state),
+              ),
+            ),
+          ),
         const SectionHeading('Keep your stories safe'),
         if (widget.state.engine.available)
           ListTile(

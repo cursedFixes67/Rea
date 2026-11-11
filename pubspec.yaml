@@ -44,6 +44,7 @@ dependencies:
   path_provider: ^2.1.6
   file_picker: ^13.3.3
   flutter_secure_storage: ^11.2.0
+  flutter_web_auth_2: ^5.1.0
   path: ^1.9.1
   scrollview_observer: ^1.27.3
 
