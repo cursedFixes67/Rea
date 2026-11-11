@@ -28,6 +28,9 @@ android {
         applicationId = "com.dreamreader.app"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
+        ndk {
+            abiFilters += if (project.findProperty("target-platform") == "android-x64") listOf("x86_64") else listOf("arm64-v8a")
+        }
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
