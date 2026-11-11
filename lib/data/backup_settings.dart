@@ -14,10 +14,16 @@ class BackupSettings {
       'autoNextChapter',
       'reverseTapZones',
     };
-    const integers = {'appearance', 'accent'};
+    const integers = {
+      'appearance',
+      'accent',
+      'downloadConcurrency',
+      'interfaceDensity',
+    };
     const lists = {'searchHistory', 'searchSources', 'homeHidden', 'homeOrder'};
     const strings = {
       'readerMode',
+      'interfaceFont',
       'bookmarks',
       'tracking.links',
       'tracking.client.anilist',
@@ -32,6 +38,16 @@ class BackupSettings {
           (lists.contains(key) &&
               (value is! List || value.any((v) => v is! String)))) {
         throw FormatException('Invalid type for backup setting "$key"');
+      }
+      if (key == 'interfaceFont' &&
+          !{'Manrope', 'Newsreader', 'system'}.contains(value)) {
+        throw const FormatException('Unsupported interface font');
+      }
+      if (key == 'interfaceDensity' && ((value as int) < -1 || value > 1)) {
+        throw const FormatException('Unsupported interface density');
+      }
+      if (key == 'downloadConcurrency' && ((value as int) < 1 || value > 6)) {
+        throw const FormatException('Invalid download concurrency');
       }
       if (key == 'appearance' && ((value as int) < 0 || value > 4)) {
         throw const FormatException('Unsupported appearance preset');

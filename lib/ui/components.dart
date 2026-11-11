@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../domain/models.dart';
+import '../domain/failure_message.dart';
 import 'theme.dart';
 
 class SectionHeading extends StatelessWidget {
@@ -226,7 +227,7 @@ class ErrorNotice extends StatelessWidget {
   Widget build(BuildContext context) => EmptyState(
     icon: Icons.cloud_off_outlined,
     title: 'Couldn’t load this',
-    message: error.toString().replaceFirst('Exception: ', ''),
+    message: FailureMessage.from(error).message,
     action: retry == null ? null : 'Try again',
     onAction: retry,
   );

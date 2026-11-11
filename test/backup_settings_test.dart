@@ -22,6 +22,13 @@ void main() {
     for (final settings in [
       {'bookmarks': '{"story::chapter":"last-page"}'},
       {'bookmarks': '{"story::chapter":-1}'},
+      {'interfaceFont': 'unknown'},
+      {'interfaceFont': 1},
+      {'interfaceDensity': -2},
+      {'interfaceDensity': '0'},
+      {'downloadConcurrency': 0},
+      {'downloadConcurrency': 7},
+      {'downloadConcurrency': '3'},
       {
         'homeOrder': ['continue', 'continue'],
       },
@@ -38,7 +45,10 @@ void main() {
     final settings = {
       'readerMode': 'rtl',
       'wifiOnly': true,
+      'downloadConcurrency': 4,
       'appearance': 1,
+      'interfaceFont': 'Newsreader',
+      'interfaceDensity': -1,
       'accent': 0xffa8e6cf,
       'homeOrder': ['continue', 'recent'],
       'bookmarks': '{"story::chapter":12}',

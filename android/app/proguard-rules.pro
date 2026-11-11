@@ -7,6 +7,8 @@
 -keep,allowshrinking class * extends uy.kohesive.injekt.api.FullTypeReference
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
+# Current KeiSource filter caches call these Kotlin top-level APIs directly.
+-keep class com.squareup.zstd.** { *; }
 -keep class org.jsoup.** { *; }
 -keep class kotlinx.serialization.** { *; }
 -keep class kotlinx.coroutines.** { *; }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -6,34 +7,68 @@ import '../data/app_state.dart';
 import '../domain/models.dart';
 import 'components.dart';
 import 'theme.dart';
+import 'reader.dart';
 
 class DownloadsScreen extends StatefulWidget {
   final AppState state;
-  const DownloadsScreen(this.state, {super.key});
+  final bool active;
+  const DownloadsScreen(this.state, {super.key, this.active = true});
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
 }
 
-class _DownloadsScreenState extends State<DownloadsScreen> {
+class _DownloadsScreenState extends State<DownloadsScreen>
+    with WidgetsBindingObserver {
   List<Json> jobs = [];
   Timer? timer;
   Object? error;
   bool polling = false;
+  final pending = <String>{};
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _schedulePoll();
+    });
+  }
+
+  bool foreground = true;
+  void _schedulePoll() {
+    timer?.cancel();
+    if (!widget.active || !foreground || !widget.state.engine.available) return;
     _load();
     timer = Timer.periodic(const Duration(seconds: 3), (_) => _load());
   }
 
   @override
+  void didUpdateWidget(DownloadsScreen old) {
+    super.didUpdateWidget(old);
+    if (old.active != widget.active) _schedulePoll();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    _schedulePoll();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
     super.dispose();
   }
 
   Future<void> _load() async {
-    if (!widget.state.engine.available || polling) return;
+    if (!mounted ||
+        !widget.active ||
+        !foreground ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        !widget.state.engine.available ||
+        polling) {
+      return;
+    }
     polling = true;
     try {
       final result = await widget.state.engine.call('downloadList');
@@ -52,7 +87,57 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
+  Future<void> _readOffline(Json job) async {
+    final id = '${job['id']}';
+    if (pending.contains(id)) return;
+    setState(() => pending.add(id));
+    try {
+      final key = '${job['mangaKey']}';
+      final split = key.indexOf('::');
+      if (split < 1) {
+        throw StateError(
+          'This download has no title identity. Download the chapter again from its source.',
+        );
+      }
+      final manga =
+          widget.state.mangaByKey[key] ??
+          Manga(
+            sourceId: key.substring(0, split),
+            url: key.substring(split + 2),
+            title: '${job['title']}',
+          );
+      var records = await widget.state.db.chapters(key);
+      var chapters = records
+          .map((r) => Chapter.fromJson(jsonDecode(r.payload)))
+          .toList();
+      final chapter =
+          chapters.where((c) => c.url == job['chapterUrl']).firstOrNull ??
+          Chapter(url: '${job['chapterUrl']}', name: '${job['chapter']}');
+      if (!chapters.any((c) => c.url == chapter.url)) {
+        await widget.state.db.saveChapters(key, [chapter]);
+        chapters.add(chapter);
+      }
+      chapters.sort((a, b) => a.number.compareTo(b.number));
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReaderScreen(widget.state, manga, chapters, chapter),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      if (mounted) setState(() => pending.remove(id));
+    }
+  }
+
   Future<void> _control(Json job, String action) async {
+    final id = '${job['id']}';
+    if (pending.contains(id)) return;
     if (action == 'delete') {
       final yes = await showDialog<bool>(
         context: context,
@@ -73,6 +158,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
       if (yes != true) return;
     }
+    if (!mounted || pending.contains(id)) return;
+    setState(() => pending.add(id));
     try {
       await widget.state.engine.call('downloadControl', {
         'id': job['id'],
@@ -84,6 +171,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('$e')));
       }
+    } finally {
+      if (mounted) setState(() => pending.remove(id));
     }
   }
 
@@ -94,7 +183,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       const Padding(
         padding: EdgeInsets.fromLTRB(24, 24, 24, 10),
         child: Text(
-          'Take stories with you',
+          'Downloads',
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
@@ -115,7 +204,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             : jobs.isEmpty
             ? const EmptyState(
                 icon: Icons.cloud_download_outlined,
-                title: 'Stories to go',
+                title: 'Read without a connection',
                 message: 'Download chapters from a title’s page and read them anywhere. Downloads continue in the background and resume completed pages after interruptions.',
               )
             : ListView.builder(
@@ -147,22 +236,33 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                   ),
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                onSelected: (action) => _control(job, action),
-                                itemBuilder: (_) => [
-                                  if (job['status'] != 'SUCCEEDED')
-                                    PopupMenuItem(
-                                      value: running ? 'pause' : 'resume',
-                                      child: Text(
-                                        running ? 'Pause' : 'Resume / retry',
-                                      ),
+                              if (pending.contains('${job['id']}'))
+                                const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
                                   ),
-                                ],
-                              ),
+                                )
+                              else
+                                PopupMenuButton<String>(
+                                  onSelected: (action) => _control(job, action),
+                                  itemBuilder: (_) => [
+                                    if (job['status'] != 'SUCCEEDED')
+                                      PopupMenuItem(
+                                        value: running ? 'pause' : 'resume',
+                                        child: Text(
+                                          running ? 'Pause' : 'Resume / retry',
+                                        ),
+                                      ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Delete'),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
                           Text(
@@ -186,6 +286,20 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               fontSize: 10,
                             ),
                           ),
+                          if (job['status'] == 'SUCCEEDED')
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: pending.contains('${job['id']}')
+                                    ? null
+                                    : () => _readOffline(job),
+                                icon: const Icon(
+                                  Icons.auto_stories_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Read offline'),
+                              ),
+                            ),
                           if ('${job['error']}'.isNotEmpty)
                             Text(
                               '${job['error']}',

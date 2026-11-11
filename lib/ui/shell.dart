@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
+import '../data/database.dart';
 import '../domain/models.dart';
 import 'theme.dart';
 import 'components.dart';
@@ -122,7 +123,7 @@ class _DreamShellState extends State<DreamShell> {
       LibraryScreen(widget.state),
       BrowseScreen(widget.state),
       UpdatesScreen(widget.state),
-      DownloadsScreen(widget.state),
+      DownloadsScreen(widget.state, active: tab == 4),
     ];
     return Scaffold(
       body: SafeArea(
@@ -207,8 +208,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       state.chapterStats[r.key]?['total'] ==
                           state.chapterStats[r.key]?['completed'])) &&
               (statusFilter == 'all' ||
-                  Manga.fromJson(jsonDecode(r.payload)).status ==
-                      int.parse(statusFilter)),
+                  state.mangaByKey[r.key]!.status == int.parse(statusFilter)),
         )
         .toList();
     if (sort == 'recent') {
@@ -333,9 +333,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ? ListView.builder(
                   itemCount: entries.length,
                   itemBuilder: (_, i) {
-                    final manga = Manga.fromJson(
-                      jsonDecode(entries[i].payload),
-                    );
+                    final manga = state.mangaByKey[entries[i].key]!;
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -365,9 +363,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   ),
                   itemCount: entries.length,
                   itemBuilder: (_, i) {
-                    final manga = Manga.fromJson(
-                      jsonDecode(entries[i].payload),
-                    );
+                    final manga = state.mangaByKey[entries[i].key]!;
                     return Stack(
                       children: [
                         MangaCard(
@@ -609,7 +605,18 @@ class UpdatesScreen extends StatefulWidget {
 
 class _UpdatesScreenState extends State<UpdatesScreen> {
   bool busy = false;
-  int done = 0;
+  int done = 0, limit = 200;
+  late Stream<List<({ChapterEntry chapter, LibraryEntry manga})>> updates;
+  @override
+  void initState() {
+    super.initState();
+    updates = widget.state.db.watchUnreadChapters(limit: limit + 1);
+  }
+
+  void _more() => setState(() {
+    limit += 200;
+    updates = widget.state.db.watchUnreadChapters(limit: limit + 1);
+  });
   final errors = <String>[];
   Future<void> _refresh() async {
     setState(() {
@@ -685,23 +692,23 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 title: 'Stay in the story',
                 message: 'Add titles to your library, then check here for unread chapters.',
               )
-            : FutureBuilder(
-                future: widget.state.db
-                    .select(widget.state.db.chapterEntries)
-                    .get(),
+            : StreamBuilder(
+                stream: updates,
                 builder: (_, snapshot) {
+                  if (snapshot.hasError) {
+                    return ErrorNotice(
+                      snapshot.error!,
+                      retry: () => setState(() {
+                        updates = widget.state.db.watchUnreadChapters(
+                          limit: limit + 1,
+                        );
+                      }),
+                    );
+                  }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final rows = snapshot.data!
-                      .where(
-                        (r) =>
-                            !r.completed &&
-                            widget.state.library.any(
-                              (m) => m.key == r.mangaKey,
-                            ),
-                      )
-                      .toList();
+                  final rows = snapshot.data!;
                   if (rows.isEmpty) {
                     return EmptyState(
                       icon: Icons.done_all,
@@ -712,13 +719,21 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     );
                   }
                   return ListView.builder(
-                    itemCount: rows.length,
+                    itemCount: rows.length > limit ? limit + 1 : rows.length,
                     itemBuilder: (_, i) {
-                      final row = rows[i];
-                      final entry = widget.state.library.firstWhere(
-                        (m) => m.key == row.mangaKey,
+                      if (i == limit) {
+                        return Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: OutlinedButton(
+                            onPressed: _more,
+                            child: const Text('Show more chapters'),
+                          ),
+                        );
+                      }
+                      final row = rows[i].chapter;
+                      final manga = Manga.fromJson(
+                        jsonDecode(rows[i].manga.payload),
                       );
-                      final manga = Manga.fromJson(jsonDecode(entry.payload));
                       final chapter = Chapter.fromJson(jsonDecode(row.payload));
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(

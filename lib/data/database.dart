@@ -147,6 +147,31 @@ class DreamDatabase extends _$DreamDatabase {
         },
       );
 
+  /// Only current library entries appear; row order favors newly received chapters.
+  Stream<List<({ChapterEntry chapter, LibraryEntry manga})>>
+  watchUnreadChapters({int limit = 201}) {
+    final query =
+        select(chapterEntries).join([
+            innerJoin(
+              libraryEntries,
+              libraryEntries.key.equalsExp(chapterEntries.mangaKey),
+            ),
+          ])
+          ..where(chapterEntries.completed.equals(false))
+          ..orderBy([OrderingTerm.desc(chapterEntries.rowId)])
+          ..limit(limit.clamp(1, 100001));
+    return query.watch().map(
+      (rows) => rows
+          .map(
+            (row) => (
+              chapter: row.readTable(chapterEntries),
+              manga: row.readTable(libraryEntries),
+            ),
+          )
+          .toList(),
+    );
+  }
+
   Future<void> markRead(Iterable<String> keys, bool completed) async {
     await transaction(() async {
       for (final key in keys) {

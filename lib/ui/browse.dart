@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../domain/models.dart';
 import 'components.dart';
+import 'failure_dialog.dart';
 import 'theme.dart';
 import 'source_filters.dart';
 import 'global_search.dart';
@@ -410,16 +411,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       if (mounted) {
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Extension could not install'),
-            content: Text('$error'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
+          builder: (context) =>
+              FailureDialog(title: 'Extension could not install', error: error),
         );
       }
     } finally {

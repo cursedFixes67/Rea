@@ -22,6 +22,7 @@ ThemeData dreamTheme(
   Appearance preset, {
   Color seed = dreamMint,
   double density = 0,
+  String font = 'Manrope',
 }) {
   final light = preset == Appearance.pureLight;
   final background = switch (preset) {
@@ -30,29 +31,36 @@ ThemeData dreamTheme(
     Appearance.pureLight => const Color(0xFFF6F5EF),
     _ => dreamInk,
   };
-  final accent = preset == Appearance.aurora ? const Color(0xFFB9B3F8) : seed;
-  final scheme =
-      ColorScheme.fromSeed(
-        seedColor: accent,
-        brightness: light ? Brightness.light : Brightness.dark,
-      ).copyWith(
-        primary: light ? const Color(0xFF276C59) : accent,
-        surface: background,
-        onSurfaceVariant: light
-            ? const Color(0xFF52626A)
-            : const Color(0xFFA7B4BB),
-      );
+  final accent = switch (preset) {
+    Appearance.aurora => const Color(0xFFB9B3F8),
+    Appearance.custom => seed,
+    _ => dreamMint,
+  };
+  final generated = ColorScheme.fromSeed(
+    seedColor: accent,
+    brightness: light ? Brightness.light : Brightness.dark,
+  );
+  final family = font == 'system' ? null : font;
+  final scheme = generated.copyWith(
+    primary: light
+        ? const Color(0xFF276C59)
+        : preset == Appearance.custom
+        ? generated.primary
+        : accent,
+    surface: background,
+    onSurfaceVariant: light ? const Color(0xFF52626A) : const Color(0xFFA7B4BB),
+  );
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: background,
-    fontFamily: 'Manrope',
+    fontFamily: family,
     visualDensity: VisualDensity(horizontal: density, vertical: density),
     appBarTheme: AppBarTheme(
       backgroundColor: background,
       surfaceTintColor: Colors.transparent,
       titleTextStyle: TextStyle(
-        fontFamily: 'Manrope',
+        fontFamily: family,
         fontWeight: FontWeight.w700,
         fontSize: 20,
         color: scheme.onSurface,
@@ -69,10 +77,10 @@ ThemeData dreamTheme(
     navigationBarTheme: NavigationBarThemeData(
       height: 76,
       backgroundColor: background,
-      indicatorColor: accent.withValues(alpha: .14),
+      indicatorColor: scheme.primary.withValues(alpha: .14),
       labelTextStyle: WidgetStatePropertyAll(
         TextStyle(
-          fontFamily: 'Manrope',
+          fontFamily: family,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: scheme.onSurface,
@@ -92,10 +100,7 @@ ThemeData dreamTheme(
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 17),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(
-          fontFamily: 'Manrope',
-          fontWeight: FontWeight.w800,
-        ),
+        textStyle: TextStyle(fontFamily: family, fontWeight: FontWeight.w800),
       ),
     ),
     chipTheme: ChipThemeData(

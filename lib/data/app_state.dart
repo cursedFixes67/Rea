@@ -18,7 +18,29 @@ class AppState extends ChangeNotifier {
   final SourceEngine engine;
   final RepositoryService repositories;
   late final tracking = TrackingService(preferences);
-  List<LibraryEntry> library = [];
+  List<LibraryEntry> _library = [];
+  List<Manga> _mangaLibrary = [];
+  Map<String, Manga> _mangaByKey = {};
+  List<LibraryEntry> get library => _library;
+  Map<String, Manga> get mangaByKey => _mangaByKey;
+  set library(List<LibraryEntry> entries) {
+    // Decode once per database emission, not on each progress/theme rebuild.
+    final decoded = entries
+        .map((r) => Manga.fromJson(jsonDecode(r.payload)))
+        .toList();
+    _library = List.unmodifiable(entries);
+    _mangaLibrary = List.unmodifiable(decoded);
+    _mangaByKey = Map.unmodifiable({
+      for (final manga in decoded) manga.key: manga,
+    });
+  }
+
+  int get unreadChapterCount => library.fold<int>(0, (sum, entry) {
+    final stats = chapterStats[entry.key];
+    return sum +
+        ((stats?['total'] as int? ?? 0) - (stats?['completed'] as int? ?? 0))
+            .clamp(0, 1 << 30);
+  });
   List<ExtensionEntry> catalogue = [];
   List<Json> sources = [], sourceErrors = [];
   Json installed = {};
@@ -44,9 +66,23 @@ class AppState extends ChangeNotifier {
   bool get onboardingDone => preferences.getBool('onboarding') ?? false;
   Color get accent =>
       Color(preferences.getInt('accent') ?? dreamMint.toARGB32());
-  List<Manga> get mangaLibrary =>
-      library.map((r) => Manga.fromJson(jsonDecode(r.payload))).toList();
-  bool hasManga(Manga manga) => library.any((r) => r.key == manga.key);
+  String get interfaceFont =>
+      preferences.getString('interfaceFont') ?? 'Manrope';
+  int get interfaceDensity =>
+      (preferences.getInt('interfaceDensity') ?? 0).clamp(-1, 1);
+  Future<void> setTypography(String font, int density) async {
+    if (!{'Manrope', 'Newsreader', 'system'}.contains(font) ||
+        density < -1 ||
+        density > 1) {
+      throw ArgumentError('Unsupported typography');
+    }
+    await preferences.setString('interfaceFont', font);
+    await preferences.setInt('interfaceDensity', density);
+    notifyListeners();
+  }
+
+  List<Manga> get mangaLibrary => _mangaLibrary;
+  bool hasManga(Manga manga) => _mangaByKey.containsKey(manga.key);
   Future<void> initialize() async {
     _chapterSubscription = db.watchChapterStats().listen((value) {
       chapterStats = value;
@@ -94,6 +130,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> setAccent(Color value) async {
     await preferences.setInt('accent', value.toARGB32());
+    notifyListeners();
+  }
+
+  Future<void> setDownloadConcurrency(int value) async {
+    if (value < 1 || value > 6) throw ArgumentError.value(value, 'value');
+    await preferences.setInt('downloadConcurrency', value);
+    if (engine.available) await engine.call('downloadConfigure');
     notifyListeners();
   }
 

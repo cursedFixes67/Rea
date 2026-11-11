@@ -10,6 +10,7 @@ import '../data/backup_settings.dart';
 import '../data/mihon_backup.dart';
 import '../data/repositories.dart';
 import 'theme.dart';
+import 'theme_studio.dart';
 import 'statistics.dart';
 import 'backup_schedule.dart';
 import 'components.dart';
@@ -82,39 +83,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               )
               .toList(),
         ),
-        if (widget.state.appearance == Appearance.custom)
-          Padding(
-            padding: const EdgeInsets.only(top: 20),
-            child: Wrap(
-              spacing: 12,
-              children:
-                  [
-                        dreamMint,
-                        const Color(0xFFFFC48C),
-                        const Color(0xFFCBB5FD),
-                        const Color(0xFF8ED0F4),
-                        const Color(0xFFF4A8BD),
-                      ]
-                      .map(
-                        (color) => IconButton.filled(
-                          tooltip:
-                              'Choose accent ${color.toARGB32().toRadixString(16)}',
-                          style: IconButton.styleFrom(backgroundColor: color),
-                          onPressed: () async {
-                            await widget.state.setAccent(color);
-                            if (mounted) setState(() {});
-                          },
-                          icon: Icon(
-                            widget.state.accent == color
-                                ? Icons.check
-                                : Icons.circle,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      )
-                      .toList(),
-            ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.palette_outlined),
+          title: const Text('Open Theme Studio'),
+          subtitle: const Text('Custom color, typography and spacing'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ThemeStudioScreen(widget.state)),
           ),
+        ),
         const SectionHeading('Your collection'),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -125,6 +104,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => RepositoriesScreen(widget.state)),
+          ),
+        ),
+        const SectionHeading('Downloads'),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Concurrent chapters'),
+          subtitle: const Text('Source rate limits still apply'),
+          trailing: DropdownButton<int>(
+            value: (widget.state.preferences.getInt('downloadConcurrency') ?? 3)
+                .clamp(1, 6),
+            items: List.generate(
+              6,
+              (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+            ),
+            onChanged: busy
+                ? null
+                : (value) => _operation(
+                    () => widget.state.setDownloadConcurrency(value!),
+                  ),
           ),
         ),
         SwitchListTile(
@@ -150,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-        const SectionHeading('Keep your stories safe'),
+        const SectionHeading('Backup & restore'),
         if (widget.state.engine.available)
           ListTile(
             contentPadding: EdgeInsets.zero,

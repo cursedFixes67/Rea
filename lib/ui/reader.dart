@@ -14,6 +14,7 @@ import '../domain/models.dart';
 import '../platform/engine.dart';
 import 'components.dart';
 import 'native_page_image.dart';
+import 'local_reader_image.dart';
 
 class ReaderScreen extends StatefulWidget {
   final AppState state;
@@ -49,6 +50,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   bool reverseTapZones = false;
   int loadGeneration = 0;
   final decodedPages = <int>{};
+  final imageRetries = <int, int>{};
   bool get canComplete =>
       pages.isNotEmpty && decodedPages.contains(pages.length - 1);
   void _decoded(int index, int generation) {
@@ -114,6 +116,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       loading = true;
       pages = [];
       decodedPages.clear();
+      imageRetries.clear();
       error = null;
     });
     try {
@@ -161,6 +164,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         throw StateError('The source returned no pages for this chapter.');
       }
       current = resumePage.clamp(0, pages.length - 1);
+      if (doublePage) current = (current ~/ 2) * 2;
       pager?.dispose();
       pager = PageController(initialPage: doublePage ? current ~/ 2 : current);
       if (mounted) {
@@ -183,12 +187,12 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
-  void _save() {
+  void _save({bool immediate = false}) {
     if (pages.isEmpty) return;
     saveTimer?.cancel();
     final url = chapter.url, position = savedPage, total = pages.length;
     final allowComplete = canComplete;
-    saveTimer = Timer(const Duration(milliseconds: 500), () {
+    void persist() {
       widget.state.db.progress(
         widget.manga.key,
         url,
@@ -196,7 +200,13 @@ class _ReaderScreenState extends State<ReaderScreen>
         total,
         allowComplete: allowComplete,
       );
-    });
+    }
+
+    if (immediate) {
+      persist();
+    } else {
+      saveTimer = Timer(const Duration(milliseconds: 500), persist);
+    }
   }
 
   void _changed(int page) {
@@ -204,6 +214,20 @@ class _ReaderScreenState extends State<ReaderScreen>
     setState(() => current = page.clamp(0, pages.length - 1));
     _save();
     _preload();
+  }
+
+  Future<List<ReaderPage>> _prefetchChapter(Chapter next) async {
+    if (widget.state.engine.available) {
+      final local = await widget.state.engine.call('downloadPages', {
+        'key': '${widget.manga.key}::${next.url}',
+      });
+      if (local is List && local.isNotEmpty) {
+        return local
+            .map((p) => ReaderPage.fromJson(Map<String, dynamic>.from(p)))
+            .toList();
+      }
+    }
+    return widget.state.engine.pages(widget.manga, next);
   }
 
   void _preload() {
@@ -216,13 +240,14 @@ class _ReaderScreenState extends State<ReaderScreen>
         chapterIndex + 1 < widget.chapters.length) {
       final next = widget.chapters[chapterIndex + 1];
       prefetchedChapter = next.url;
-      prefetchedPages = widget.state.engine
-          .pages(widget.manga, next)
-          .catchError((Object error) {
-            prefetchedChapter = null;
-            prefetchedPages = null;
-            return <ReaderPage>[];
-          });
+      final generation = loadGeneration;
+      prefetchedPages = _prefetchChapter(next).catchError((Object error) {
+        if (generation == loadGeneration && prefetchedChapter == next.url) {
+          prefetchedChapter = null;
+          prefetchedPages = null;
+        }
+        return <ReaderPage>[];
+      });
     }
     for (var i = current + 1; i <= current + 2 && i < pages.length; i++) {
       if (widget.state.engine.available && pages[i].sourceId.isNotEmpty) {
@@ -290,7 +315,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       stopwatch.start();
     } else {
       stopwatch.stop();
-      _save();
+      _save(immediate: true);
     }
   }
 
@@ -342,7 +367,13 @@ class _ReaderScreenState extends State<ReaderScreen>
       int? frame,
       bool sync,
     ) {
-      if (frame != null) _decoded(index, generation);
+      if (frame == null) {
+        return const SizedBox(
+          height: 260,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        );
+      }
+      _decoded(index, generation);
       return child;
     }
 
@@ -368,8 +399,16 @@ class _ReaderScreenState extends State<ReaderScreen>
           ),
           TextButton(
             onPressed: () async {
-              await CachedNetworkImage.evictFromCache(page.url);
-              if (mounted) setState(() {});
+              if (page.url.startsWith('/')) {
+                await FileImage(File(page.url)).evict();
+              } else {
+                await CachedNetworkImage.evictFromCache(page.url);
+              }
+              if (mounted) {
+                setState(
+                  () => imageRetries[index] = (imageRetries[index] ?? 0) + 1,
+                );
+              }
             },
             child: const Text('Retry'),
           ),
@@ -377,19 +416,16 @@ class _ReaderScreenState extends State<ReaderScreen>
       ),
     );
     if (page.url.startsWith('/')) {
-      return Image(
-        image: ResizeImage(
-          FileImage(File(page.url)),
-          width: 1800,
-          height: 8192,
-          policy: ResizeImagePolicy.fit,
-        ),
-        fit: fit ? BoxFit.contain : BoxFit.fitWidth,
-        width: double.infinity,
-        frameBuilder: decodedFrame,
-        errorBuilder: (_, _, _) => failure,
+      return LocalReaderImage(
+        key: ValueKey('${page.url}:${imageRetries[index] ?? 0}'),
+        path: page.url,
+        engine: widget.state.engine,
+        fit: fit,
+        onDecoded: () => _decoded(index, generation),
+        errorBuilder: (_) => failure,
       );
     }
+
     return Image(
       image: ResizeImage(
         CachedNetworkImageProvider(page.url, headers: page.headers),
@@ -654,7 +690,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Make yourself comfortable',
+                  'Reader settings',
                   style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 20),
@@ -680,6 +716,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 );
                                 setState(() {
                                   mode = entry.key;
+                                  if (doublePage) current = (current ~/ 2) * 2;
                                   pager?.dispose();
                                   pager = PageController(
                                     initialPage: doublePage
@@ -750,7 +787,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                     _nativeSettings();
                   },
                 ),
-                Row(
+                Wrap(
                   children: [
                     TextButton.icon(
                       onPressed: () => SystemChrome.setPreferredOrientations([

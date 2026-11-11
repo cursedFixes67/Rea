@@ -50,6 +50,21 @@ void main() {
       isTrue,
     );
     expect((await db.chapters('1::/2999')).length, 10);
+    final feedWatch = Stopwatch()..start();
+    final updates = await db.watchUnreadChapters(limit: 201).first;
+    feedWatch.stop();
+    expect(updates.length, 201);
+    expect(updates.first.manga.key, '1::/2999');
+    expect(
+      updates.every(
+        (entry) =>
+            !entry.chapter.completed &&
+            entry.chapter.mangaKey == entry.manga.key,
+      ),
+      isTrue,
+    );
+    // ignore: avoid_print
+    print('Host SQLite first201 updates: ${feedWatch.elapsedMilliseconds} ms');
     // Record measurements without claiming that host timings predict device FPS.
     // ignore: avoid_print
     print(

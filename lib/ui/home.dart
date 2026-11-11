@@ -503,14 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             ReadingRoom(
               titles: widget.state.library.length,
-              unread: widget.state.chapterStats.values.fold<int>(
-                0,
-                (total, entry) =>
-                    total +
-                    ((entry['total'] as int? ?? 0) -
-                            (entry['completed'] as int? ?? 0))
-                        .clamp(0, 1000000),
-              ),
+              unread: widget.state.unreadChapterCount,
               onBrowse: widget.onBrowse,
               onLibrary: widget.onLibrary,
             ),

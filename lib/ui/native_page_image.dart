@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
 import '../platform/engine.dart';
+import 'local_reader_image.dart';
 
 class NativePageImage extends StatefulWidget {
   final ReaderPage page;
@@ -22,6 +21,7 @@ class NativePageImage extends StatefulWidget {
 }
 
 class _NativePageImageState extends State<NativePageImage> {
+  int attempt = 0;
   late Future<String> path = load();
   Future<String> load() async {
     final result = await widget.engine.call('image', {
@@ -53,7 +53,10 @@ class _NativePageImageState extends State<NativePageImage> {
           style: const TextStyle(color: Colors.white60, fontSize: 12),
         ),
         TextButton(
-          onPressed: () => setState(() => path = load()),
+          onPressed: () => setState(() {
+            attempt++;
+            path = load();
+          }),
           child: const Text('Retry'),
         ),
       ],
@@ -70,20 +73,13 @@ class _NativePageImageState extends State<NativePageImage> {
           child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         );
       }
-      return Image(
-        image: ResizeImage(
-          FileImage(File(snapshot.data!)),
-          width: 1800,
-          height: 8192,
-          policy: ResizeImagePolicy.fit,
-        ),
-        fit: widget.fit ? BoxFit.contain : BoxFit.fitWidth,
-        width: double.infinity,
-        frameBuilder: (_, child, frame, _) {
-          if (frame != null) widget.onDecoded?.call();
-          return child;
-        },
-        errorBuilder: (_, error, _) => failure(error),
+      return LocalReaderImage(
+        key: ValueKey('${snapshot.data}:$attempt'),
+        path: snapshot.data!,
+        engine: widget.engine,
+        fit: widget.fit,
+        onDecoded: () => widget.onDecoded?.call(),
+        errorBuilder: failure,
       );
     },
   );

@@ -74,13 +74,14 @@ class MainActivity : FlutterActivity() {
                         }; result.success(decode(value))
                     } catch (error: Exception) { result.error("BACKUP_ERROR", error.message, null) }
                 }
-                "downloadEnqueue", "downloadControl", "downloadList", "downloadPages" -> activityScope.launch {
+                "downloadEnqueue", "downloadControl", "downloadList", "downloadPages", "downloadConfigure" -> activityScope.launch {
                     try {
                         val value = withContext(Dispatchers.IO) {
                             val controller = DownloadController(applicationContext)
                             val args = JSONObject(call.arguments as? Map<*, *> ?: emptyMap<Any, Any>())
                             when (call.method) {
                                 "downloadEnqueue" -> controller.enqueue(args)
+                                "downloadConfigure" -> controller.configure()
                                 "downloadControl" -> controller.control(args)
                                 "downloadPages" -> controller.pages(args.getString("key"))
                                 else -> controller.list()
@@ -88,6 +89,18 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(decode(value))
                     } catch (error: Exception) { result.error("DOWNLOAD_ERROR", error.message, null) }
+                }
+
+                "readerImageInfo", "readerImageRegion" -> activityScope.launch {
+                    try {
+                        val value = withContext(Dispatchers.IO) {
+                            val regions = ImageRegions(applicationContext)
+                            val path = requireNotNull(call.argument<String>("path"))
+                            if (call.method == "readerImageInfo") regions.info(path)
+                            else regions.decode(path, requireNotNull(call.argument<Int>("index")))
+                        }
+                        result.success(value)
+                    } catch (error: Exception) { result.error("IMAGE_ERROR", error.message, null) }
                 }
 
                 "readerSettings" -> {

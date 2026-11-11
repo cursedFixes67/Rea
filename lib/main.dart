@@ -57,7 +57,12 @@ class DreamReader extends StatelessWidget {
     builder: (_, child) => MaterialApp(
       title: 'Dream Reader',
       debugShowCheckedModeBanner: false,
-      theme: dreamTheme(state.appearance, seed: state.accent),
+      theme: dreamTheme(
+        state.appearance,
+        seed: state.accent,
+        font: state.interfaceFont,
+        density: state.interfaceDensity.toDouble(),
+      ),
       home: state.onboardingDone ? DreamShell(state) : WelcomeScreen(state),
     ),
   );
